@@ -51,6 +51,22 @@
       font-weight: 700;
       letter-spacing: -0.3px;
       white-space: nowrap;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: var(--radius);
+      border: 1px solid transparent;
+      transition: border-color 0.15s, background 0.15s;
+    }
+
+    header h1:hover {
+      border-color: var(--border);
+      background: var(--surface-2);
+    }
+
+    header h1.editing {
+      border-color: var(--accent);
+      background: var(--surface-2);
+      outline: none;
     }
 
     .date-controls {
@@ -695,7 +711,7 @@
 <body>
 
 <header>
-  <h1>Gantt Chart Maker</h1>
+  <h1 id="chartTitle" contenteditable="true" spellcheck="false">Gantt Chart Maker</h1>
   <div class="date-controls">
     <label for="startDate">From</label>
     <input type="date" id="startDate">
@@ -745,7 +761,7 @@
   <div class="gantt-wrapper" id="ganttWrapper">
     <div class="gantt-container" id="ganttContainer">
       <div class="export-title" id="exportTitle">
-        <div>Gantt Chart</div>
+        <div id="exportChartName">Gantt Chart Maker</div>
         <div class="export-date-range" id="exportDateRange"></div>
       </div>
       <div class="gantt-header" id="ganttHeader">
@@ -1249,6 +1265,26 @@ function openNoteModal(weekIdx) {
     }
   });
 }
+
+/* ── Editable chart title ── */
+const $chartTitle = document.getElementById('chartTitle');
+
+$chartTitle.addEventListener('focus', () => $chartTitle.classList.add('editing'));
+
+$chartTitle.addEventListener('blur', () => {
+  $chartTitle.classList.remove('editing');
+  const text = $chartTitle.textContent.trim();
+  if (!text) $chartTitle.textContent = 'Gantt Chart Maker';
+  document.getElementById('exportChartName').textContent = $chartTitle.textContent;
+  document.title = $chartTitle.textContent;
+});
+
+$chartTitle.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    $chartTitle.blur();
+  }
+});
 
 /* ── Export as image ── */
 document.getElementById('exportBtn').addEventListener('click', async () => {
