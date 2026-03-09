@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gantt Chart Maker</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface-2: #232732;
+      --border: #2e3345;
+      --text: #e4e6ef;
+      --text-muted: #8b8fa3;
+      --accent: #6c5ce7;
+      --accent-hover: #7f71ed;
+      --danger: #e74c5c;
+      --danger-hover: #f05e6d;
+      --row-alt: #1e2230;
+      --grid-line: #252a3a;
+      --today: rgba(108, 92, 231, 0.15);
+      --radius: 8px;
+      --shadow: 0 4px 24px rgba(0,0,0,0.3);
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+      white-space: nowrap;
+    }
+
+    .date-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-left: auto;
+    }
+
+    .date-controls label {
+      font-size: 13px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .date-controls input[type="date"] {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .date-controls input[type="date"]:focus {
+      border-color: var(--accent);
+    }
+
+    .date-controls input[type="date"]::-webkit-calendar-picker-indicator {
+      filter: invert(0.7);
+      cursor: pointer;
+    }
+
+    .btn {
+      padding: 7px 16px;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      transition: background 0.15s, transform 0.1s;
+    }
+
+    .btn:active { transform: scale(0.97); }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover { background: var(--accent-hover); }
+
+    .btn-danger {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .btn-danger:hover { background: var(--danger-hover); }
+
+    .btn-ghost {
+      background: var(--surface-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover { background: var(--border); }
+
+    /* ── Main layout ── */
+    .app {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: 280px;
+      min-width: 280px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .sidebar-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sidebar-section h2 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .new-task-form {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .new-task-form input,
+    .new-task-form select {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      outline: none;
+    }
+
+    .new-task-form input:focus,
+    .new-task-form select:focus {
+      border-color: var(--accent);
+    }
+
+    .color-picker-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .color-swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color 0.15s, transform 0.1s;
+    }
+
+    .color-swatch:hover { transform: scale(1.15); }
+    .color-swatch.selected { border-color: #fff; }
+
+    /* ── Task bank (unplaced tasks) ── */
+    .task-bank {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+    }
+
+    .task-bank-item {
+      padding: 10px 12px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: grab;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      user-select: none;
+      transition: transform 0.1s, box-shadow 0.15s;
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .task-bank-item:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow);
+    }
+
+    .task-bank-item.dragging {
+      opacity: 0.5;
+    }
+
+    .task-bank-item .task-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .task-bank-item .task-weeks {
+      font-size: 11px;
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+
+    .task-bank-item .delete-task {
+      background: none;
+      border: none;
+      color: rgba(255,255,255,0.4);
+      cursor: pointer;
+      font-size: 16px;
+      line-height: 1;
+      padding: 0 2px;
+    }
+
+    .task-bank-item .delete-task:hover { color: var(--danger); }
+
+    .empty-bank {
+      color: var(--text-muted);
+      font-size: 13px;
+      text-align: center;
+      padding: 24px 8px;
+      line-height: 1.5;
+    }
+
+    /* ── Gantt area ── */
+    .gantt-wrapper {
+      flex: 1;
+      overflow: auto;
+      position: relative;
+    }
+
+    .gantt-container {
+      display: flex;
+      flex-direction: column;
+      min-width: max-content;
+    }
+
+    /* Week header */
+    .gantt-header {
+      display: flex;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .gantt-header .row-label-spacer {
+      min-width: 180px;
+      max-width: 180px;
+      border-right: 1px solid var(--border);
+      padding: 10px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+    }
+
+    .week-columns {
+      display: flex;
+      flex: 1;
+    }
+
+    .week-col-header {
+      min-width: 110px;
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border-right: 1px solid var(--border);
+      line-height: 1.4;
+    }
+
+    .week-col-header .week-label { font-weight: 700; font-size: 12px; color: var(--text); }
+    .week-col-header .week-dates { font-size: 10px; }
+
+    .week-col-header.today-col {
+      background: var(--today);
+    }
+
+    /* Gantt rows */
+    .gantt-body {
+      flex: 1;
+    }
+
+    .gantt-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      min-height: 48px;
+      position: relative;
+    }
+
+    .gantt-row:nth-child(even) {
+      background: var(--row-alt);
+    }
+
+    .gantt-row .row-label {
+      min-width: 180px;
+      max-width: 180px;
+      display: flex;
+      align-items: center;
+      padding: 6px 14px;
+      font-size: 13px;
+      font-weight: 500;
+      border-right: 1px solid var(--border);
+      gap: 8px;
+    }
+
+    .row-label .row-color-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .row-label .row-task-name {
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .row-label .remove-row-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 14px;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .gantt-row:hover .remove-row-btn { opacity: 1; }
+    .row-label .remove-row-btn:hover { color: var(--danger); }
+
+    .row-cells {
+      display: flex;
+      flex: 1;
+      position: relative;
+    }
+
+    .week-cell {
+      min-width: 110px;
+      flex: 1;
+      border-right: 1px solid var(--grid-line);
+      position: relative;
+    }
+
+    .week-cell.today-col {
+      background: var(--today);
+    }
+
+    .week-cell.drag-over {
+      background: rgba(108, 92, 231, 0.12);
+    }
+
+    /* Task bars on the chart */
+    .task-bar {
+      position: absolute;
+      top: 6px;
+      bottom: 6px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #fff;
+      cursor: grab;
+      user-select: none;
+      z-index: 5;
+      transition: box-shadow 0.15s;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .task-bar:hover {
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+
+    .task-bar .resize-handle {
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      width: 8px;
+      cursor: col-resize;
+    }
+
+    .task-bar .resize-handle.left { left: 0; }
+    .task-bar .resize-handle.right { right: 0; }
+
+    /* Drop zone (full row) */
+    .drop-row-zone {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
+    /* Add-row zone at bottom */
+    .gantt-add-row {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      min-height: 48px;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: default;
+    }
+
+    .gantt-add-row.drag-over-add {
+      background: rgba(108, 92, 231, 0.08);
+      color: var(--accent);
+    }
+
+    /* ── Tooltips / Floating ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      padding: 12px 20px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--text);
+      box-shadow: var(--shadow);
+      z-index: 1000;
+      animation: fadeIn 0.2s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3c4260; }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .sidebar { width: 220px; min-width: 220px; }
+      .gantt-header .row-label-spacer,
+      .gantt-row .row-label { min-width: 130px; max-width: 130px; }
+      .week-col-header, .week-cell { min-width: 85px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Gantt Chart Maker</h1>
+  <div class="date-controls">
+    <label for="startDate">From</label>
+    <input type="date" id="startDate">
+    <label for="endDate">To</label>
+    <input type="date" id="endDate">
+    <button class="btn btn-primary" id="applyDates">Apply</button>
+    <button class="btn btn-ghost" id="thisQuarterBtn">This Quarter</button>
+  </div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <h2>New Task</h2>
+      <form class="new-task-form" id="newTaskForm">
+        <input type="text" id="taskName" placeholder="Task name" required>
+        <select id="taskWeeks">
+          <option value="1">1 week</option>
+          <option value="2" selected>2 weeks</option>
+          <option value="3">3 weeks</option>
+          <option value="4">4 weeks</option>
+          <option value="5">5 weeks</option>
+          <option value="6">6 weeks</option>
+          <option value="8">8 weeks</option>
+          <option value="10">10 weeks</option>
+          <option value="12">12 weeks</option>
+        </select>
+        <div>
+          <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Color</label>
+          <div class="color-picker-row" id="colorPicker"></div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="margin-top:4px;">Add Task</button>
+      </form>
+    </div>
+
+    <div class="sidebar-section" style="padding-bottom:8px;">
+      <h2>Task Bank</h2>
+      <p style="font-size:11px;color:var(--text-muted);margin-top:-4px;margin-bottom:4px;">Drag tasks onto the chart</p>
+    </div>
+    <div class="task-bank" id="taskBank">
+      <div class="empty-bank">No tasks yet.<br>Create one above to get started.</div>
+    </div>
+  </aside>
+
+  <div class="gantt-wrapper" id="ganttWrapper">
+    <div class="gantt-container" id="ganttContainer">
+      <div class="gantt-header" id="ganttHeader">
+        <div class="row-label-spacer">Tasks</div>
+        <div class="week-columns" id="weekHeaders"></div>
+      </div>
+      <div class="gantt-body" id="ganttBody"></div>
+      <div class="gantt-add-row" id="ganttAddRow">Drop a task here to add a new row</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLORS = [
+  '#6c5ce7','#00b894','#e17055','#0984e3','#fdcb6e',
+  '#e84393','#00cec9','#d63031','#636e72','#a29bfe',
+  '#55efc4','#fab1a0','#74b9ff','#ffeaa7','#fd79a8',
+];
+
+let tasks = [];
+let chartRows = [];
+let weeks = [];
+let selectedColor = COLORS[0];
+let nextId = 1;
+
+const $startDate = document.getElementById('startDate');
+const $endDate = document.getElementById('endDate');
+const $weekHeaders = document.getElementById('weekHeaders');
+const $ganttBody = document.getElementById('ganttBody');
+const $taskBank = document.getElementById('taskBank');
+const $ganttAddRow = document.getElementById('ganttAddRow');
+
+/* ── Date helpers ── */
+function mondayOf(d) {
+  const dt = new Date(d);
+  const day = dt.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  dt.setDate(dt.getDate() + diff);
+  dt.setHours(0, 0, 0, 0);
+  return dt;
+}
+
+function getQuarterRange() {
+  const now = new Date();
+  const qMonth = Math.floor(now.getMonth() / 3) * 3;
+  const start = new Date(now.getFullYear(), qMonth, 1);
+  const end = new Date(now.getFullYear(), qMonth + 3, 0);
+  return { start, end };
+}
+
+function formatShort(d) {
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function isoDate(d) {
+  return d.toISOString().split('T')[0];
+}
+
+function buildWeeks(startDate, endDate) {
+  const result = [];
+  let current = mondayOf(startDate);
+  const end = new Date(endDate);
+  end.setHours(23, 59, 59);
+  while (current <= end) {
+    const weekEnd = new Date(current);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    result.push({ start: new Date(current), end: weekEnd });
+    current.setDate(current.getDate() + 7);
+  }
+  return result;
+}
+
+function isCurrentWeek(w) {
+  const now = new Date();
+  return now >= w.start && now <= w.end;
+}
+
+/* ── Color picker ── */
+function renderColorPicker() {
+  const container = document.getElementById('colorPicker');
+  container.innerHTML = COLORS.map(c =>
+    `<div class="color-swatch ${c === selectedColor ? 'selected' : ''}" data-color="${c}" style="background:${c};"></div>`
+  ).join('');
+  container.querySelectorAll('.color-swatch').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedColor = el.dataset.color;
+      renderColorPicker();
+    });
+  });
+}
+
+/* ── Render week headers ── */
+function renderHeaders() {
+  $weekHeaders.innerHTML = weeks.map((w, i) => {
+    const current = isCurrentWeek(w);
+    return `<div class="week-col-header ${current ? 'today-col' : ''}" data-week="${i}">
+      <div class="week-label">W${i + 1}</div>
+      <div class="week-dates">${formatShort(w.start)} – ${formatShort(w.end)}</div>
+    </div>`;
+  }).join('');
+}
+
+/* ── Render task bank ── */
+function renderTaskBank() {
+  const unplaced = tasks.filter(t => !t.placed);
+  if (unplaced.length === 0) {
+    $taskBank.innerHTML = '<div class="empty-bank">No tasks in bank.<br>Create one above or remove from chart.</div>';
+    return;
+  }
+  $taskBank.innerHTML = unplaced.map(t => `
+    <div class="task-bank-item" draggable="true" data-task-id="${t.id}" style="background:${t.color};">
+      <span class="task-name">${escHtml(t.name)}</span>
+      <span class="task-weeks">${t.weeks}w</span>
+      <button class="delete-task" data-task-id="${t.id}">&times;</button>
+    </div>
+  `).join('');
+
+  $taskBank.querySelectorAll('.task-bank-item').forEach(el => {
+    el.addEventListener('dragstart', onBankDragStart);
+    el.addEventListener('dragend', onDragEnd);
+  });
+
+  $taskBank.querySelectorAll('.delete-task').forEach(el => {
+    el.addEventListener('click', e => {
+      e.stopPropagation();
+      tasks = tasks.filter(t => t.id !== parseInt(el.dataset.taskId));
+      renderTaskBank();
+    });
+  });
+}
+
+/* ── Render Gantt rows ── */
+function renderGantt() {
+  $ganttBody.innerHTML = '';
+  chartRows.forEach((row, rowIdx) => {
+    const $row = document.createElement('div');
+    $row.className = 'gantt-row';
+    $row.dataset.rowIdx = rowIdx;
+
+    const $label = document.createElement('div');
+    $label.className = 'row-label';
+    $label.innerHTML = `
+      <span class="row-color-dot" style="background:${row.task.color};"></span>
+      <span class="row-task-name">${escHtml(row.task.name)}</span>
+      <button class="remove-row-btn" title="Remove from chart">&times;</button>
+    `;
+    $label.querySelector('.remove-row-btn').addEventListener('click', () => {
+      row.task.placed = false;
+      row.task.startWeek = null;
+      chartRows.splice(rowIdx, 1);
+      renderGantt();
+      renderTaskBank();
+    });
+
+    const $cells = document.createElement('div');
+    $cells.className = 'row-cells';
+
+    weeks.forEach((w, wi) => {
+      const $cell = document.createElement('div');
+      $cell.className = 'week-cell' + (isCurrentWeek(w) ? ' today-col' : '');
+      $cell.dataset.week = wi;
+      $cell.dataset.rowIdx = rowIdx;
+      $cells.appendChild($cell);
+    });
+
+    if (row.task.startWeek !== null && row.task.startWeek !== undefined) {
+      const bar = createTaskBar(row.task, rowIdx);
+      $cells.appendChild(bar);
+    }
+
+    $cells.addEventListener('dragover', onRowDragOver);
+    $cells.addEventListener('dragleave', onRowDragLeave);
+    $cells.addEventListener('drop', e => onRowDrop(e, rowIdx));
+
+    $row.appendChild($label);
+    $row.appendChild($cells);
+    $ganttBody.appendChild($row);
+  });
+}
+
+function createTaskBar(task, rowIdx) {
+  const bar = document.createElement('div');
+  bar.className = 'task-bar';
+  bar.style.background = task.color;
+  bar.style.left = `calc(${task.startWeek} * (100% / ${weeks.length}))`;
+  bar.style.width = `calc(${task.weeks} * (100% / ${weeks.length}) - 4px)`;
+  bar.textContent = task.name;
+  bar.draggable = true;
+  bar.dataset.taskId = task.id;
+  bar.dataset.rowIdx = rowIdx;
+
+  bar.addEventListener('dragstart', onBarDragStart);
+  bar.addEventListener('dragend', onDragEnd);
+
+  const leftHandle = document.createElement('div');
+  leftHandle.className = 'resize-handle left';
+  leftHandle.addEventListener('mousedown', e => onResizeStart(e, task, 'left'));
+
+  const rightHandle = document.createElement('div');
+  rightHandle.className = 'resize-handle right';
+  rightHandle.addEventListener('mousedown', e => onResizeStart(e, task, 'right'));
+
+  bar.appendChild(leftHandle);
+  bar.appendChild(rightHandle);
+
+  return bar;
+}
+
+/* ── Drag from bank ── */
+let dragData = null;
+
+function onBankDragStart(e) {
+  const id = parseInt(e.currentTarget.dataset.taskId);
+  dragData = { source: 'bank', taskId: id };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', '');
+  e.currentTarget.classList.add('dragging');
+}
+
+function onBarDragStart(e) {
+  e.stopPropagation();
+  const id = parseInt(e.currentTarget.dataset.taskId);
+  const rowIdx = parseInt(e.currentTarget.dataset.rowIdx);
+  dragData = { source: 'chart', taskId: id, rowIdx };
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', '');
+  e.currentTarget.style.opacity = '0.4';
+}
+
+function onDragEnd(e) {
+  dragData = null;
+  document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+  document.querySelectorAll('.drag-over-add').forEach(el => el.classList.remove('drag-over-add'));
+  e.currentTarget.style.opacity = '';
+}
+
+function getWeekFromX(e, container) {
+  const rect = container.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const cellWidth = rect.width / weeks.length;
+  return Math.max(0, Math.min(weeks.length - 1, Math.floor(x / cellWidth)));
+}
+
+function onRowDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const cells = e.currentTarget.querySelectorAll('.week-cell');
+  cells.forEach(c => c.classList.remove('drag-over'));
+  if (dragData) {
+    const wi = getWeekFromX(e, e.currentTarget);
+    if (cells[wi]) cells[wi].classList.add('drag-over');
+  }
+}
+
+function onRowDragLeave(e) {
+  e.currentTarget.querySelectorAll('.week-cell').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onRowDrop(e, rowIdx) {
+  e.preventDefault();
+  if (!dragData) return;
+
+  const wi = getWeekFromX(e, e.currentTarget);
+  const task = tasks.find(t => t.id === dragData.taskId);
+  if (!task) return;
+
+  if (dragData.source === 'bank') {
+    const existingRow = chartRows[rowIdx];
+    if (existingRow && existingRow.task.id !== task.id) {
+      existingRow.task.placed = false;
+      existingRow.task.startWeek = null;
+      chartRows[rowIdx] = { task };
+    }
+    task.placed = true;
+    task.startWeek = wi;
+    if (!chartRows.find(r => r.task.id === task.id)) {
+      chartRows[rowIdx] = { task };
+    }
+  } else if (dragData.source === 'chart') {
+    task.startWeek = wi;
+  }
+
+  dragData = null;
+  renderGantt();
+  renderTaskBank();
+}
+
+/* ── Drop on add-row zone ── */
+$ganttAddRow.addEventListener('dragover', e => {
+  e.preventDefault();
+  if (dragData && dragData.source === 'bank') {
+    $ganttAddRow.classList.add('drag-over-add');
+  }
+});
+
+$ganttAddRow.addEventListener('dragleave', () => {
+  $ganttAddRow.classList.remove('drag-over-add');
+});
+
+$ganttAddRow.addEventListener('drop', e => {
+  e.preventDefault();
+  $ganttAddRow.classList.remove('drag-over-add');
+  if (!dragData || dragData.source !== 'bank') return;
+
+  const task = tasks.find(t => t.id === dragData.taskId);
+  if (!task) return;
+
+  task.placed = true;
+  task.startWeek = 0;
+  chartRows.push({ task });
+
+  dragData = null;
+  renderGantt();
+  renderTaskBank();
+});
+
+/* ── Resize handles ── */
+function onResizeStart(e, task, side) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const rowCells = e.target.closest('.row-cells');
+  const rect = rowCells.getBoundingClientRect();
+  const cellWidth = rect.width / weeks.length;
+
+  const onMouseMove = (ev) => {
+    const x = ev.clientX - rect.left;
+    const hoverWeek = Math.max(0, Math.min(weeks.length - 1, Math.floor(x / cellWidth)));
+
+    if (side === 'right') {
+      const newWeeks = hoverWeek - task.startWeek + 1;
+      if (newWeeks >= 1 && newWeeks <= weeks.length) {
+        task.weeks = newWeeks;
+        renderGantt();
+      }
+    } else {
+      const endWeek = task.startWeek + task.weeks - 1;
+      if (hoverWeek <= endWeek) {
+        task.weeks = endWeek - hoverWeek + 1;
+        task.startWeek = hoverWeek;
+        renderGantt();
+      }
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
+}
+
+/* ── Add task form ── */
+document.getElementById('newTaskForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const name = document.getElementById('taskName').value.trim();
+  const numWeeks = parseInt(document.getElementById('taskWeeks').value);
+  if (!name) return;
+
+  tasks.push({
+    id: nextId++,
+    name,
+    weeks: numWeeks,
+    color: selectedColor,
+    placed: false,
+    startWeek: null,
+  });
+
+  document.getElementById('taskName').value = '';
+  renderTaskBank();
+  showToast(`"${name}" added to task bank`);
+});
+
+/* ── Date controls ── */
+function applyDates() {
+  const s = $startDate.value;
+  const e = $endDate.value;
+  if (!s || !e) return;
+  weeks = buildWeeks(new Date(s + 'T00:00:00'), new Date(e + 'T00:00:00'));
+  chartRows.forEach(row => {
+    if (row.task.startWeek !== null && row.task.startWeek >= weeks.length) {
+      row.task.startWeek = weeks.length - 1;
+    }
+  });
+  renderHeaders();
+  renderGantt();
+}
+
+document.getElementById('applyDates').addEventListener('click', applyDates);
+
+document.getElementById('thisQuarterBtn').addEventListener('click', () => {
+  const { start, end } = getQuarterRange();
+  $startDate.value = isoDate(start);
+  $endDate.value = isoDate(end);
+  applyDates();
+});
+
+/* ── Toast ── */
+function showToast(msg) {
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2000);
+}
+
+/* ── Util ── */
+function escHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+/* ── Init ── */
+renderColorPicker();
+const { start: qStart, end: qEnd } = getQuarterRange();
+$startDate.value = isoDate(qStart);
+$endDate.value = isoDate(qEnd);
+applyDates();
+</script>
+
+</body>
+</html>
