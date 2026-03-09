@@ -487,6 +487,17 @@
       border-bottom: 1px solid var(--border);
       min-height: 52px;
       background: var(--surface);
+      position: sticky;
+      top: 0;
+      z-index: 9;
+    }
+
+    .notes-row.collapsed {
+      min-height: 0;
+    }
+
+    .notes-row.collapsed .note-cells {
+      display: none;
     }
 
     .notes-row .row-label {
@@ -501,6 +512,23 @@
       letter-spacing: 0.5px;
       color: var(--text-muted);
       border-right: 1px solid var(--border);
+      cursor: pointer;
+      user-select: none;
+      gap: 6px;
+    }
+
+    .notes-row .row-label:hover {
+      color: var(--text);
+    }
+
+    .notes-row .collapse-icon {
+      font-size: 10px;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .notes-row.collapsed .collapse-icon {
+      transform: rotate(-90deg);
     }
 
     .notes-row .note-cells {
@@ -768,11 +796,11 @@
         <div class="row-label-spacer">Tasks</div>
         <div class="week-columns" id="weekHeaders"></div>
       </div>
-      <div class="gantt-body" id="ganttBody"></div>
       <div class="notes-row" id="notesRow">
-        <div class="row-label">Notes</div>
+        <div class="row-label" id="notesToggle"><span class="collapse-icon">▼</span> Notes</div>
         <div class="note-cells" id="noteCells"></div>
       </div>
+      <div class="gantt-body" id="ganttBody"></div>
       <div class="gantt-add-row" id="ganttAddRow">Drop a task here to add a new row</div>
     </div>
   </div>
@@ -1159,6 +1187,7 @@ function applyDates() {
   renderHeaders();
   renderGantt();
   renderNotes();
+  syncStickyOffsets();
 }
 
 document.getElementById('applyDates').addEventListener('click', applyDates);
@@ -1205,6 +1234,19 @@ function renderNotes() {
     cell.addEventListener('click', () => openNoteModal(wi));
     $noteCells.appendChild(cell);
   });
+}
+
+document.getElementById('notesToggle').addEventListener('click', () => {
+  const row = document.getElementById('notesRow');
+  row.classList.toggle('collapsed');
+  syncStickyOffsets();
+});
+
+function syncStickyOffsets() {
+  const header = document.getElementById('ganttHeader');
+  const notesRow = document.getElementById('notesRow');
+  const headerH = header.getBoundingClientRect().height;
+  notesRow.style.top = headerH + 'px';
 }
 
 function openNoteModal(weekIdx) {
@@ -1344,6 +1386,7 @@ const { start: qStart, end: qEnd } = getQuarterRange();
 $startDate.value = isoDate(qStart);
 $endDate.value = isoDate(qEnd);
 applyDates();
+window.addEventListener('resize', syncStickyOffsets);
 </script>
 
 </body>
