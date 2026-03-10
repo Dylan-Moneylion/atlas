@@ -240,6 +240,21 @@
       opacity: 0.5;
     }
 
+    .task-bank-item .bank-color-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s;
+    }
+
+    .task-bank-item .bank-color-dot:hover {
+      transform: scale(1.3);
+      border-color: rgba(255,255,255,0.5);
+    }
+
     .task-bank-item .task-name {
       flex: 1;
       overflow: hidden;
@@ -364,8 +379,8 @@
     }
 
     .gantt-header .row-label-spacer {
-      min-width: 180px;
-      max-width: 180px;
+      min-width: 200px;
+      max-width: 200px;
       border-right: 1px solid var(--border);
       padding: 10px 14px;
       font-size: 12px;
@@ -386,15 +401,19 @@
       min-width: 110px;
       flex: 1;
       text-align: center;
-      padding: 8px 4px;
+      padding: 8px 6px;
       font-size: 11px;
       color: var(--text-muted);
       border-right: 1px solid var(--border);
       line-height: 1.4;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
     }
 
-    .week-col-header .week-label { font-weight: 700; font-size: 12px; color: var(--text); }
-    .week-col-header .week-dates { font-size: 10px; }
+    .week-col-header .week-label { font-weight: 700; font-size: 12px; color: var(--text); white-space: nowrap; }
+    .week-col-header .week-dates { font-size: 10px; white-space: nowrap; }
 
     .week-col-header .header-note-dot {
       display: inline-block;
@@ -418,7 +437,7 @@
     .gantt-row {
       display: flex;
       border-bottom: 1px solid var(--border);
-      min-height: 48px;
+      min-height: 52px;
       position: relative;
     }
 
@@ -427,15 +446,15 @@
     }
 
     .gantt-row .row-label {
-      min-width: 180px;
-      max-width: 180px;
+      min-width: 200px;
+      max-width: 200px;
       display: flex;
       align-items: center;
-      padding: 6px 14px;
+      padding: 6px 10px;
       font-size: 13px;
       font-weight: 500;
       border-right: 1px solid var(--border);
-      gap: 8px;
+      gap: 6px;
     }
 
     .row-label .drag-handle {
@@ -471,17 +490,62 @@
     }
 
     .row-label .row-color-dot {
-      width: 10px;
-      height: 10px;
+      width: 12px;
+      height: 12px;
       border-radius: 50%;
       flex-shrink: 0;
+      cursor: pointer;
+      transition: transform 0.1s, box-shadow 0.15s;
+      border: 2px solid transparent;
+    }
+
+    .row-label .row-color-dot:hover {
+      transform: scale(1.3);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.2);
+    }
+
+    .color-dropdown {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 200;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 176px;
+      animation: fadeIn 0.12s;
+    }
+
+    .color-dropdown .color-option {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: transform 0.1s, border-color 0.12s;
+    }
+
+    .color-dropdown .color-option:hover {
+      transform: scale(1.2);
+    }
+
+    .color-dropdown .color-option.active {
+      border-color: #fff;
     }
 
     .row-label .row-task-name {
       flex: 1;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.3;
+      text-align: center;
+      word-break: break-word;
     }
 
     .row-label .remove-row-btn {
@@ -521,12 +585,13 @@
     /* Task bars on the chart */
     .task-bar {
       position: absolute;
-      top: 6px;
-      bottom: 6px;
+      top: 4px;
+      bottom: 4px;
       border-radius: 6px;
       display: flex;
       align-items: center;
-      padding: 0 10px;
+      justify-content: center;
+      padding: 2px 12px;
       font-size: 12px;
       font-weight: 600;
       color: #fff;
@@ -546,7 +611,12 @@
     .task-bar .bar-label {
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      line-height: 1.3;
+      text-align: center;
+      word-break: break-word;
       flex: 1;
       cursor: grab;
     }
@@ -636,8 +706,8 @@
     }
 
     .notes-row .row-label {
-      min-width: 180px;
-      max-width: 180px;
+      min-width: 200px;
+      max-width: 200px;
       display: flex;
       align-items: center;
       padding: 6px 14px;
@@ -702,6 +772,7 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       word-break: break-word;
+      text-align: center;
     }
 
     .note-cell .note-preview:not(:empty) {
@@ -713,6 +784,7 @@
       color: var(--border);
       opacity: 0;
       transition: opacity 0.12s;
+      text-align: center;
     }
 
     .note-cell:hover .note-placeholder {
@@ -865,9 +937,9 @@
     @media (max-width: 768px) {
       .sidebar { width: 220px; min-width: 220px; }
       .gantt-header .row-label-spacer,
-      .gantt-row .row-label { min-width: 130px; max-width: 130px; }
+      .gantt-row .row-label { min-width: 150px; max-width: 150px; }
       .week-col-header, .week-cell, .note-cell { min-width: 85px; }
-      .notes-row .row-label { min-width: 130px; max-width: 130px; }
+      .notes-row .row-label { min-width: 150px; max-width: 150px; }
     }
   </style>
 </head>
@@ -1108,6 +1180,46 @@ function showWeeksDropdown(anchorEl, task) {
   dd._closeFn = closeFn;
 }
 
+/* ── Color picker dropdown ── */
+function showColorDropdown(anchorEl, task) {
+  closeColorDropdown();
+
+  const rect = anchorEl.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.className = 'color-dropdown';
+  dd.id = 'colorDropdown';
+  dd.style.top = (rect.bottom + 4) + 'px';
+  dd.style.left = rect.left + 'px';
+
+  COLORS.forEach(c => {
+    const swatch = document.createElement('div');
+    swatch.className = 'color-option' + (c === task.color ? ' active' : '');
+    swatch.style.background = c;
+    swatch.addEventListener('click', () => {
+      task.color = c;
+      closeColorDropdown();
+      renderTaskBank();
+      renderGantt();
+    });
+    dd.appendChild(swatch);
+  });
+
+  document.body.appendChild(dd);
+  setTimeout(() => {
+    document.addEventListener('click', function closeFn(e) {
+      if (!dd.contains(e.target) && e.target !== anchorEl) {
+        closeColorDropdown();
+        document.removeEventListener('click', closeFn);
+      }
+    });
+  }, 0);
+}
+
+function closeColorDropdown() {
+  const existing = document.getElementById('colorDropdown');
+  if (existing) existing.remove();
+}
+
 function closeWeeksDropdown() {
   const existing = document.getElementById('weeksDropdown');
   if (existing) {
@@ -1125,6 +1237,7 @@ function renderTaskBank() {
   }
   $taskBank.innerHTML = unplaced.map(t => `
     <div class="task-bank-item" draggable="true" data-task-id="${t.id}" style="background:${t.color};">
+      <span class="bank-color-dot" data-task-id="${t.id}" title="Change color" style="background:rgba(255,255,255,0.3);"></span>
       <span class="task-name">${escHtml(t.name)}</span>
       <span class="task-weeks">${t.weeks}w</span>
       <button class="delete-task" data-task-id="${t.id}">&times;</button>
@@ -1145,6 +1258,12 @@ function renderTaskBank() {
       const taskId = parseInt(el.dataset.taskId);
       const task = tasks.find(t => t.id === taskId);
       if (task) showWeeksDropdown(e.currentTarget, task);
+    });
+    el.querySelector('.bank-color-dot').addEventListener('click', e => {
+      e.stopPropagation();
+      const taskId = parseInt(el.dataset.taskId);
+      const task = tasks.find(t => t.id === taskId);
+      if (task) showColorDropdown(e.currentTarget, task);
     });
   });
 
@@ -1180,6 +1299,11 @@ function renderGantt() {
       chartRows.splice(rowIdx, 1);
       renderGantt();
       renderTaskBank();
+    });
+
+    $label.querySelector('.row-color-dot').addEventListener('click', e => {
+      e.stopPropagation();
+      showColorDropdown(e.currentTarget, row.task);
     });
 
     $label.querySelector('.row-task-name').addEventListener('dblclick', e => {
