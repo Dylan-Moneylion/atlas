@@ -588,7 +588,10 @@
     .gantt-header .row-label-spacer {
       min-width: var(--label-width);
       max-width: var(--label-width);
-      position: relative;
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: var(--surface);
       border-right: 1px solid var(--border);
       padding: 10px 14px;
       font-size: 12px;
@@ -675,6 +678,7 @@
       border-bottom: 1px solid var(--border);
       min-height: 52px;
       position: relative;
+      background: var(--bg);
     }
 
     .gantt-row:nth-child(even) {
@@ -691,6 +695,10 @@
       font-weight: 500;
       border-right: 1px solid var(--border);
       gap: 6px;
+      position: sticky;
+      left: 0;
+      z-index: 6;
+      background: inherit;
     }
 
     .row-label .drag-handle {
@@ -957,6 +965,9 @@
       display: flex;
       align-items: center;
       padding: 6px 14px;
+      position: sticky;
+      left: 0;
+      z-index: 3;
       font-size: 12px;
       font-weight: 600;
       text-transform: uppercase;
