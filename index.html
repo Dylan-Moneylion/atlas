@@ -2221,7 +2221,8 @@ document.getElementById('exportBtn').addEventListener('click', async () => {
     });
 
     const link = document.createElement('a');
-    link.download = `gantt-chart-${new Date().toISOString().split('T')[0]}.png`;
+    const chartName = (document.getElementById('chartTitle').textContent || 'Gantt Chart').replace(/[/\\?%*:|"<>]/g, '');
+    link.download = `${chartName}-${new Date().toISOString().split('T')[0]}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
     showToast('Chart exported as PNG');
@@ -2361,7 +2362,8 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
     });
 
     XLSX.utils.book_append_sheet(wb, ws, title.substring(0, 31));
-    XLSX.writeFile(wb, `gantt-chart-${new Date().toISOString().split('T')[0]}.xlsx`);
+    const safeName = title.replace(/[/\\?%*:|"<>]/g, '');
+    XLSX.writeFile(wb, `${safeName}-${new Date().toISOString().split('T')[0]}.xlsx`);
     showToast('Chart exported as Excel');
   } catch (err) {
     showToast('Excel export failed — see console');
@@ -2391,7 +2393,8 @@ function saveConfig() {
   const data = JSON.stringify(gatherState(), null, 2);
   const blob = new Blob([data], { type: 'application/json' });
   const link = document.createElement('a');
-  link.download = `gantt-config-${new Date().toISOString().split('T')[0]}.json`;
+  const configName = (document.getElementById('chartTitle').textContent || 'Gantt Chart').replace(/[/\\?%*:|"<>]/g, '');
+  link.download = `${configName}-${new Date().toISOString().split('T')[0]}.json`;
   link.href = URL.createObjectURL(blob);
   link.click();
   URL.revokeObjectURL(link.href);
