@@ -438,6 +438,38 @@
       gap: 8px;
     }
 
+    .row-label .drag-handle {
+      cursor: grab;
+      color: var(--border);
+      font-size: 14px;
+      line-height: 1;
+      padding: 2px 0;
+      flex-shrink: 0;
+      opacity: 0;
+      transition: opacity 0.15s, color 0.1s;
+      user-select: none;
+    }
+
+    .gantt-row:hover .drag-handle {
+      opacity: 1;
+    }
+
+    .drag-handle:hover {
+      color: var(--text-muted);
+    }
+
+    .gantt-row.row-dragging {
+      opacity: 0.4;
+    }
+
+    .gantt-row.row-drop-above {
+      box-shadow: inset 0 2px 0 0 var(--accent);
+    }
+
+    .gantt-row.row-drop-below {
+      box-shadow: inset 0 -2px 0 0 var(--accent);
+    }
+
     .row-label .row-color-dot {
       width: 10px;
       height: 10px;
@@ -1136,6 +1168,7 @@ function renderGantt() {
     const $label = document.createElement('div');
     $label.className = 'row-label';
     $label.innerHTML = `
+      <span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>
       <span class="row-color-dot" style="background:${row.task.color};"></span>
       <span class="row-task-name">${escHtml(row.task.name)}</span>
       <span class="row-weeks">${row.task.weeks}w</span>
@@ -1156,6 +1189,59 @@ function renderGantt() {
     $label.querySelector('.row-weeks').addEventListener('click', e => {
       e.stopPropagation();
       showWeeksDropdown(e.currentTarget, row.task);
+    });
+
+    const handle = $label.querySelector('.drag-handle');
+    handle.addEventListener('dragstart', e => {
+      e.stopPropagation();
+      rowDragIdx = rowIdx;
+      dragData = { source: 'reorder' };
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', '');
+      requestAnimationFrame(() => $row.classList.add('row-dragging'));
+    });
+    handle.addEventListener('dragend', () => {
+      rowDragIdx = null;
+      dragData = null;
+      document.querySelectorAll('.row-dragging, .row-drop-above, .row-drop-below')
+        .forEach(el => el.classList.remove('row-dragging', 'row-drop-above', 'row-drop-below'));
+    });
+
+    $row.addEventListener('dragover', e => {
+      if (rowDragIdx === null) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      document.querySelectorAll('.row-drop-above, .row-drop-below')
+        .forEach(el => el.classList.remove('row-drop-above', 'row-drop-below'));
+      const rect = $row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      $row.classList.add(e.clientY < mid ? 'row-drop-above' : 'row-drop-below');
+    });
+
+    $row.addEventListener('dragleave', () => {
+      $row.classList.remove('row-drop-above', 'row-drop-below');
+    });
+
+    $row.addEventListener('drop', e => {
+      if (rowDragIdx === null) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = $row.getBoundingClientRect();
+      const mid = rect.top + rect.height / 2;
+      let targetIdx = rowIdx;
+      if (e.clientY >= mid) targetIdx += 1;
+      if (rowDragIdx === targetIdx || rowDragIdx === targetIdx - 1) {
+        rowDragIdx = null;
+        dragData = null;
+        renderGantt();
+        return;
+      }
+      const [moved] = chartRows.splice(rowDragIdx, 1);
+      const insertAt = targetIdx > rowDragIdx ? targetIdx - 1 : targetIdx;
+      chartRows.splice(insertAt, 0, moved);
+      rowDragIdx = null;
+      dragData = null;
+      renderGantt();
     });
 
     const $cells = document.createElement('div');
@@ -1224,6 +1310,7 @@ function createTaskBar(task, rowIdx) {
 
 /* ── Drag from bank ── */
 let dragData = null;
+let rowDragIdx = null;
 
 function onBankDragStart(e) {
   const id = parseInt(e.currentTarget.dataset.taskId);
@@ -1259,6 +1346,7 @@ function getWeekFromX(e, container) {
 }
 
 function onRowDragOver(e) {
+  if (dragData && dragData.source === 'reorder') return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const cells = e.currentTarget.querySelectorAll('.week-cell');
@@ -1275,7 +1363,7 @@ function onRowDragLeave(e) {
 
 function onRowDrop(e, rowIdx) {
   e.preventDefault();
-  if (!dragData) return;
+  if (!dragData || dragData.source === 'reorder') return;
 
   const wi = getWeekFromX(e, e.currentTarget);
   const task = tasks.find(t => t.id === dragData.taskId);
