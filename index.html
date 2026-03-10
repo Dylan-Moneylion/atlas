@@ -308,8 +308,15 @@
       border-color: rgba(255,255,255,0.5);
     }
 
-    .task-bank-item .task-name {
+    .task-bank-item .bank-name-group {
       flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .task-bank-item .task-name {
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -398,6 +405,129 @@
       border-radius: 4px;
       outline: none;
       width: 100%;
+    }
+
+    /* ── Categories ── */
+    .category-manager {
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+
+    .category-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+
+    .category-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 12px;
+    }
+
+    .category-tag-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      line-height: 1;
+      padding: 0;
+    }
+
+    .category-tag-remove:hover { color: var(--danger); }
+
+    .category-add-row {
+      display: flex;
+      gap: 4px;
+    }
+
+    .category-add-row input {
+      flex: 1;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 5px 8px;
+      border-radius: var(--radius);
+      font-size: 12px;
+      outline: none;
+    }
+
+    .category-add-row input:focus { border-color: var(--accent); }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 12px;
+    }
+
+    .category-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.12);
+      color: rgba(255,255,255,0.75);
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 8px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: background 0.12s;
+      vertical-align: middle;
+      letter-spacing: 0.3px;
+      text-transform: uppercase;
+    }
+
+    .category-badge:hover {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .category-badge.no-cat {
+      opacity: 0;
+      font-size: 8px;
+      padding: 1px 4px;
+    }
+
+    .gantt-row:hover .category-badge.no-cat,
+    .task-bank-item:hover .category-badge.no-cat {
+      opacity: 0.4;
+    }
+
+    .category-dropdown {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 200;
+      padding: 4px 0;
+      min-width: 120px;
+      max-height: 200px;
+      overflow-y: auto;
+      animation: fadeIn 0.12s;
+    }
+
+    .category-dropdown-item {
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .category-dropdown-item:hover {
+      background: var(--surface-2);
+    }
+
+    .category-dropdown-item.active {
+      color: var(--accent);
+      font-weight: 600;
     }
 
     .empty-bank {
@@ -589,8 +719,16 @@
       border-color: #fff;
     }
 
-    .row-label .row-task-name {
+    .row-label .row-name-group {
       flex: 1;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .row-label .row-task-name {
       overflow: hidden;
       text-overflow: ellipsis;
       display: -webkit-box;
@@ -599,6 +737,7 @@
       line-height: 1.3;
       text-align: center;
       word-break: break-word;
+      width: 100%;
     }
 
     .row-label .remove-row-btn {
@@ -1040,12 +1179,23 @@
           <option value="10">10 weeks</option>
           <option value="12">12 weeks</option>
         </select>
+        <select id="taskCategory">
+          <option value="">No category</option>
+        </select>
         <div>
           <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Color</label>
           <div class="color-picker-row" id="colorPicker"></div>
         </div>
         <button type="submit" class="btn btn-primary" style="margin-top:4px;">Add Task</button>
       </form>
+      <div class="category-manager">
+        <label style="font-size:12px;color:var(--text-muted);display:block;margin-bottom:6px;">Manage Categories</label>
+        <div class="category-tags" id="categoryTags"></div>
+        <div class="category-add-row">
+          <input type="text" id="newCategoryInput" placeholder="New category">
+          <button class="btn btn-ghost btn-sm" id="addCategoryBtn">+</button>
+        </div>
+      </div>
     </div>
 
     <div class="sidebar-section" style="padding-bottom:8px;">
@@ -1088,6 +1238,7 @@ let tasks = [];
 let chartRows = [];
 let weeks = [];
 let weekNotes = {};
+let categories = [];
 let selectedColor = COLORS[0];
 let nextId = 1;
 
@@ -1142,6 +1293,102 @@ function buildWeeks(startDate, endDate) {
 function isCurrentWeek(w) {
   const now = new Date();
   return now >= w.start && now <= w.end;
+}
+
+/* ── Category management ── */
+function renderCategorySelect() {
+  const sel = document.getElementById('taskCategory');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">No category</option>' +
+    categories.map(c => `<option value="${escHtml(c)}">${escHtml(c)}</option>`).join('');
+  if (categories.includes(current)) sel.value = current;
+}
+
+function renderCategoryTags() {
+  const container = document.getElementById('categoryTags');
+  if (categories.length === 0) {
+    container.innerHTML = '<span style="font-size:11px;color:var(--text-muted);">No categories yet</span>';
+    return;
+  }
+  container.innerHTML = categories.map(c =>
+    `<span class="category-tag">${escHtml(c)}<button class="category-tag-remove" data-cat="${escHtml(c)}">&times;</button></span>`
+  ).join('');
+  container.querySelectorAll('.category-tag-remove').forEach(btn => {
+    btn.addEventListener('click', () => {
+      categories = categories.filter(cat => cat !== btn.dataset.cat);
+      renderCategoryTags();
+      renderCategorySelect();
+    });
+  });
+}
+
+document.getElementById('addCategoryBtn').addEventListener('click', () => {
+  const input = document.getElementById('newCategoryInput');
+  const val = input.value.trim();
+  if (val && !categories.includes(val)) {
+    categories.push(val);
+    renderCategoryTags();
+    renderCategorySelect();
+  }
+  input.value = '';
+});
+
+document.getElementById('newCategoryInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('addCategoryBtn').click();
+  }
+});
+
+/* ── Category dropdown ── */
+function showCategoryDropdown(anchorEl, task) {
+  closeCategoryDropdown();
+
+  const rect = anchorEl.getBoundingClientRect();
+  const dd = document.createElement('div');
+  dd.className = 'category-dropdown';
+  dd.id = 'categoryDropdown';
+  dd.style.top = (rect.bottom + 4) + 'px';
+  dd.style.left = rect.left + 'px';
+
+  const noneItem = document.createElement('div');
+  noneItem.className = 'category-dropdown-item' + (!task.category ? ' active' : '');
+  noneItem.textContent = 'No category';
+  noneItem.addEventListener('click', () => {
+    task.category = null;
+    closeCategoryDropdown();
+    renderTaskBank();
+    renderGantt();
+  });
+  dd.appendChild(noneItem);
+
+  categories.forEach(c => {
+    const item = document.createElement('div');
+    item.className = 'category-dropdown-item' + (c === task.category ? ' active' : '');
+    item.textContent = c;
+    item.addEventListener('click', () => {
+      task.category = c;
+      closeCategoryDropdown();
+      renderTaskBank();
+      renderGantt();
+    });
+    dd.appendChild(item);
+  });
+
+  document.body.appendChild(dd);
+  setTimeout(() => {
+    document.addEventListener('click', function closeFn(e) {
+      if (!dd.contains(e.target) && e.target !== anchorEl) {
+        closeCategoryDropdown();
+        document.removeEventListener('click', closeFn);
+      }
+    });
+  }, 0);
+}
+
+function closeCategoryDropdown() {
+  const existing = document.getElementById('categoryDropdown');
+  if (existing) existing.remove();
 }
 
 /* ── Color picker ── */
@@ -1302,7 +1549,10 @@ function renderTaskBank() {
   $taskBank.innerHTML = unplaced.map(t => `
     <div class="task-bank-item" draggable="true" data-task-id="${t.id}" style="background:${t.color};">
       <span class="bank-color-dot" data-task-id="${t.id}" title="Change color" style="background:rgba(255,255,255,0.3);"></span>
-      <span class="task-name">${escHtml(t.name)}</span>
+      <span class="bank-name-group">
+        <span class="category-badge ${t.category ? '' : 'no-cat'}" data-task-id="${t.id}" title="Change category">${t.category ? escHtml(t.category) : '+ tag'}</span>
+        <span class="task-name">${escHtml(t.name)}</span>
+      </span>
       <span class="task-weeks">${t.weeks}w</span>
       <button class="delete-task" data-task-id="${t.id}">&times;</button>
     </div>
@@ -1329,6 +1579,12 @@ function renderTaskBank() {
       const task = tasks.find(t => t.id === taskId);
       if (task) showColorDropdown(e.currentTarget, task);
     });
+    el.querySelector('.category-badge').addEventListener('click', e => {
+      e.stopPropagation();
+      const taskId = parseInt(el.dataset.taskId);
+      const task = tasks.find(t => t.id === taskId);
+      if (task) showCategoryDropdown(e.currentTarget, task);
+    });
   });
 
   $taskBank.querySelectorAll('.delete-task').forEach(el => {
@@ -1353,7 +1609,10 @@ function renderGantt() {
     $label.innerHTML = `
       <span class="drag-handle" draggable="true" title="Drag to reorder">⠿</span>
       <span class="row-color-dot" style="background:${row.task.color};"></span>
-      <span class="row-task-name">${escHtml(row.task.name)}</span>
+      <span class="row-name-group">
+        <span class="category-badge ${row.task.category ? '' : 'no-cat'}" data-task-id="${row.task.id}" title="Change category">${row.task.category ? escHtml(row.task.category) : '+ tag'}</span>
+        <span class="row-task-name">${escHtml(row.task.name)}</span>
+      </span>
       <span class="row-weeks">${row.task.weeks}w</span>
       <button class="remove-row-btn" title="Remove from chart">&times;</button>
     `;
@@ -1377,6 +1636,11 @@ function renderGantt() {
     $label.querySelector('.row-weeks').addEventListener('click', e => {
       e.stopPropagation();
       showWeeksDropdown(e.currentTarget, row.task);
+    });
+
+    $label.querySelector('.category-badge').addEventListener('click', e => {
+      e.stopPropagation();
+      showCategoryDropdown(e.currentTarget, row.task);
     });
 
     const handle = $label.querySelector('.drag-handle');
@@ -1472,6 +1736,7 @@ function createTaskBar(task, rowIdx) {
   barLabel.className = 'bar-label';
   barLabel.textContent = task.name;
   bar.appendChild(barLabel);
+
 
   barLabel.addEventListener('dblclick', e => {
     e.stopPropagation();
@@ -1657,11 +1922,14 @@ document.getElementById('newTaskForm').addEventListener('submit', e => {
   const numWeeks = parseInt(document.getElementById('taskWeeks').value);
   if (!name) return;
 
+  const cat = document.getElementById('taskCategory').value || null;
+
   tasks.push({
     id: nextId++,
     name,
     weeks: numWeeks,
     color: selectedColor,
+    category: cat,
     placed: false,
     startWeek: null,
   });
@@ -1887,6 +2155,7 @@ function gatherState() {
     tasks,
     chartRowIds: chartRows.map(r => r.task.id),
     weekNotes,
+    categories,
     nextId,
   };
 }
@@ -1911,6 +2180,7 @@ function loadConfig(file) {
       tasks = data.tasks || [];
       nextId = data.nextId || (tasks.length ? Math.max(...tasks.map(t => t.id)) + 1 : 1);
       weekNotes = data.weekNotes || {};
+      categories = data.categories || [];
 
       chartRows = (data.chartRowIds || [])
         .map(id => { const t = tasks.find(tk => tk.id === id); return t ? { task: t } : null; })
@@ -1927,6 +2197,8 @@ function loadConfig(file) {
 
       applyDates();
       renderTaskBank();
+      renderCategoryTags();
+      renderCategorySelect();
       showToast('Config loaded');
     } catch (err) {
       showToast('Failed to load config — invalid file');
@@ -1958,6 +2230,8 @@ document.getElementById('sidebarToggle').addEventListener('click', () => {
 
 /* ── Init ── */
 renderColorPicker();
+renderCategoryTags();
+renderCategorySelect();
 const { start: qStart, end: qEnd } = getQuarterRange();
 $startDate.value = isoDate(qStart);
 $endDate.value = isoDate(qEnd);
