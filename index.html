@@ -1958,6 +1958,12 @@ function onRowDrop(e, rowIdx) {
   const task = tasks.find(t => t.id === dragData.taskId);
   if (!task) return;
 
+  if (wi + task.weeks > weeks.length) {
+    showToast(`Not enough room — task needs ${task.weeks}w but only ${weeks.length - wi} left`);
+    dragData = null;
+    return;
+  }
+
   if (dragData.source === 'bank') {
     const existingRow = chartRows[rowIdx];
     if (existingRow && existingRow.task.id !== task.id) {
@@ -1998,6 +2004,12 @@ $ganttAddRow.addEventListener('drop', e => {
 
   const task = tasks.find(t => t.id === dragData.taskId);
   if (!task) return;
+
+  if (task.weeks > weeks.length) {
+    showToast(`Not enough room — task needs ${task.weeks}w but chart has ${weeks.length}`);
+    dragData = null;
+    return;
+  }
 
   task.placed = true;
   task.startWeek = 0;
