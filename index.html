@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ATLAS</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -2594,13 +2594,7 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
     chartRows.forEach((row, ri) => {
       const t = row.task;
       const r = [t.name, t.category || '', t.weeks + 'w'];
-      weeks.forEach((_, wi) => {
-        if (t.startWeek !== null && wi === t.startWeek) {
-          r.push(t.name);
-        } else {
-          r.push('');
-        }
-      });
+      weeks.forEach(() => r.push(''));
       data.push(r);
 
       if (t.startWeek !== null && t.weeks > 1) {
@@ -2627,29 +2621,21 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
     weeks.forEach(() => colWidths.push({ wch: 16 }));
     ws['!cols'] = colWidths;
 
-    function hexToArgb(hex) {
+    function hexToRgb(hex) {
       hex = hex.replace('#', '');
       if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-      return 'FF' + hex.toUpperCase();
-    }
-
-    function luminance(hex) {
-      hex = hex.replace('#', '');
-      const r = parseInt(hex.substring(0,2), 16) / 255;
-      const g = parseInt(hex.substring(2,4), 16) / 255;
-      const b = parseInt(hex.substring(4,6), 16) / 255;
-      return 0.299 * r + 0.587 * g + 0.114 * b;
+      return hex.toUpperCase();
     }
 
     const headerStyle = {
-      font: { bold: true, color: { rgb: 'FFFFFFFF' }, sz: 11 },
-      fill: { fgColor: { rgb: 'FF1A1D27' } },
+      font: { bold: true, color: { rgb: 'FFFFFF' }, sz: 11 },
+      fill: { patternType: 'solid', fgColor: { rgb: '1A1D27' } },
       alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
       border: {
-        top: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        bottom: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        left: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        right: { style: 'thin', color: { rgb: 'FF2E3345' } },
+        top: { style: 'thin', color: { rgb: '2E3345' } },
+        bottom: { style: 'thin', color: { rgb: '2E3345' } },
+        left: { style: 'thin', color: { rgb: '2E3345' } },
+        right: { style: 'thin', color: { rgb: '2E3345' } },
       }
     };
 
@@ -2659,24 +2645,21 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
       if (ws[addr]) ws[addr].s = headerStyle;
     }
 
-    const taskCellStyle = (taskColor, fontColor) => ({
-      fill: { fgColor: { rgb: taskColor } },
-      font: { bold: true, color: { rgb: fontColor }, sz: 10 },
-      alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+    const taskCellStyle = (taskColor) => ({
+      fill: { patternType: 'solid', fgColor: { rgb: taskColor } },
       border: {
-        top: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        bottom: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        left: { style: 'thin', color: { rgb: 'FF2E3345' } },
-        right: { style: 'thin', color: { rgb: 'FF2E3345' } },
+        top: { style: 'thin', color: { rgb: '2E3345' } },
+        bottom: { style: 'thin', color: { rgb: '2E3345' } },
+        left: { style: 'thin', color: { rgb: '2E3345' } },
+        right: { style: 'thin', color: { rgb: '2E3345' } },
       }
     });
 
     chartRows.forEach((row, ri) => {
       const t = row.task;
       const excelRow = ri + 1;
-      const taskColor = hexToArgb(t.color);
-      const fontColor = luminance(t.color) > 0.5 ? 'FF000000' : 'FFFFFFFF';
-      const style = taskCellStyle(taskColor, fontColor);
+      const taskColor = hexToRgb(t.color);
+      const style = taskCellStyle(taskColor);
 
       if (t.startWeek !== null) {
         for (let wi = t.startWeek; wi < t.startWeek + t.weeks; wi++) {
