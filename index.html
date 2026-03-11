@@ -124,6 +124,40 @@
       border-color: var(--accent);
     }
 
+    .date-mode-toggle {
+      display: flex;
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .mode-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      padding: 5px 14px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+
+    .mode-btn:hover {
+      color: var(--text);
+    }
+
+    .mode-btn.active {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .date-mode-panel {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
     .btn {
       padding: 7px 16px;
       border: none;
@@ -1209,18 +1243,26 @@
 <header>
   <h1 id="chartTitle" contenteditable="true" spellcheck="false">Gantt Chart Maker</h1>
   <div class="date-controls">
-    <label for="startDate">From</label>
-    <input type="date" id="startDate">
-    <label for="endDate">To</label>
-    <input type="date" id="endDate">
+    <div class="date-mode-toggle">
+      <button class="mode-btn active" id="modeQuarter" data-mode="quarter">Quarter</button>
+      <button class="mode-btn" id="modeCustom" data-mode="custom">Custom</button>
+    </div>
+    <div class="date-mode-panel" id="panelQuarter">
+      <select class="quarter-select" id="quarterSelect">
+        <option value="1">Q1</option>
+        <option value="2">Q2</option>
+        <option value="3">Q3</option>
+        <option value="4">Q4</option>
+      </select>
+      <select class="quarter-select" id="yearSelect"></select>
+    </div>
+    <div class="date-mode-panel" id="panelCustom" style="display:none;">
+      <label for="startDate">From</label>
+      <input type="date" id="startDate">
+      <label for="endDate">To</label>
+      <input type="date" id="endDate">
+    </div>
     <button class="btn btn-primary" id="applyDates">Apply</button>
-    <select class="quarter-select" id="quarterSelect">
-      <option value="1">Q1</option>
-      <option value="2">Q2</option>
-      <option value="3">Q3</option>
-      <option value="4">Q4</option>
-    </select>
-    <select class="quarter-select" id="yearSelect"></select>
     <span style="width:1px;height:24px;background:var(--border);margin:0 4px;"></span>
     <button class="btn btn-export" id="exportBtn">Export as Image</button>
     <button class="btn btn-export" id="exportExcelBtn">Export as Excel</button>
@@ -2037,11 +2079,10 @@ function applyDates() {
   syncStickyOffsets();
 }
 
-document.getElementById('applyDates').addEventListener('click', applyDates);
-
 /* ── Quarter / Year selectors ── */
 const $quarterSelect = document.getElementById('quarterSelect');
 const $yearSelect = document.getElementById('yearSelect');
+let dateMode = 'quarter';
 
 (function populateYearSelect() {
   const currentYear = new Date().getFullYear();
@@ -2055,6 +2096,27 @@ const $yearSelect = document.getElementById('yearSelect');
   $quarterSelect.value = Math.floor(new Date().getMonth() / 3) + 1;
 })();
 
+document.querySelectorAll('.mode-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    dateMode = btn.dataset.mode;
+    document.getElementById('panelQuarter').style.display = dateMode === 'quarter' ? 'flex' : 'none';
+    document.getElementById('panelCustom').style.display = dateMode === 'custom' ? 'flex' : 'none';
+  });
+});
+
+document.getElementById('applyDates').addEventListener('click', () => {
+  if (dateMode === 'quarter') {
+    const q = parseInt($quarterSelect.value);
+    const y = parseInt($yearSelect.value);
+    const { start, end } = getQuarterRange(q, y);
+    $startDate.value = isoDate(start);
+    $endDate.value = isoDate(end);
+  }
+  applyDates();
+});
+
 function applyQuarterSelection() {
   const q = parseInt($quarterSelect.value);
   const y = parseInt($yearSelect.value);
@@ -2063,9 +2125,6 @@ function applyQuarterSelection() {
   $endDate.value = isoDate(end);
   applyDates();
 }
-
-$quarterSelect.addEventListener('change', applyQuarterSelection);
-$yearSelect.addEventListener('change', applyQuarterSelection);
 
 /* ── Toast ── */
 function showToast(msg) {
