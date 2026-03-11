@@ -350,6 +350,11 @@
       opacity: 0.5;
     }
 
+    .task-bank-item.too-long {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
     .task-bank-item .bank-color-dot {
       width: 12px;
       height: 12px;
@@ -1669,8 +1674,10 @@ function renderTaskBank() {
     $taskBank.innerHTML = '<div class="empty-bank">No tasks in bank.<br>Create one above or remove from chart.</div>';
     return;
   }
-  $taskBank.innerHTML = unplaced.map(t => `
-    <div class="task-bank-item" draggable="true" data-task-id="${t.id}" style="background:${t.color};">
+  $taskBank.innerHTML = unplaced.map(t => {
+    const tooLong = t.weeks > weeks.length;
+    return `
+    <div class="task-bank-item ${tooLong ? 'too-long' : ''}" draggable="${!tooLong}" data-task-id="${t.id}" style="background:${t.color};" ${tooLong ? 'title="Task exceeds date range"' : ''}>
       <span class="bank-color-dot" data-task-id="${t.id}" title="Change color" style="background:rgba(255,255,255,0.3);"></span>
       <span class="bank-name-group">
         <span class="category-badge ${t.category ? '' : 'no-cat'}" data-task-id="${t.id}" title="Change category">${t.category ? escHtml(t.category) : '+ tag'}</span>
@@ -1678,8 +1685,8 @@ function renderTaskBank() {
       </span>
       <span class="task-weeks">${t.weeks}w</span>
       <button class="delete-task" data-task-id="${t.id}">&times;</button>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 
   $taskBank.querySelectorAll('.task-bank-item').forEach(el => {
     el.addEventListener('dragstart', onBankDragStart);
@@ -1890,6 +1897,12 @@ let rowDragIdx = null;
 
 function onBankDragStart(e) {
   const id = parseInt(e.currentTarget.dataset.taskId);
+  const task = tasks.find(t => t.id === id);
+  if (task && task.weeks > weeks.length) {
+    e.preventDefault();
+    showToast(`"${task.name}" is ${task.weeks}w but the chart only has ${weeks.length} weeks`);
+    return;
+  }
   dragData = { source: 'bank', taskId: id };
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', '');
@@ -2068,12 +2081,24 @@ function applyDates() {
   const e = $endDate.value;
   if (!s || !e) return;
   weeks = buildWeeks(new Date(s + 'T00:00:00'), new Date(e + 'T00:00:00'));
-  chartRows.forEach(row => {
-    if (row.task.startWeek !== null && row.task.startWeek >= weeks.length) {
-      row.task.startWeek = weeks.length - 1;
+  const removed = [];
+  chartRows = chartRows.filter(row => {
+    const t = row.task;
+    if (t.startWeek === null) return true;
+    const endWeek = t.startWeek + t.weeks - 1;
+    if (t.startWeek >= weeks.length || endWeek >= weeks.length) {
+      t.placed = false;
+      t.startWeek = null;
+      removed.push(t.name);
+      return false;
     }
+    return true;
   });
+  if (removed.length) {
+    showToast(`Moved ${removed.length} task${removed.length > 1 ? 's' : ''} back to bank (out of range)`);
+  }
   renderHeaders();
+  renderTaskBank();
   renderGantt();
   renderNotes();
   syncStickyOffsets();
