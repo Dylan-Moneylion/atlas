@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Gantt Chart Maker</title>
+  <title>ATLAS</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
@@ -48,6 +48,10 @@
       flex-wrap: wrap;
     }
 
+    .title-group {
+      position: relative;
+    }
+
     header h1 {
       font-size: 20px;
       font-weight: 700;
@@ -63,6 +67,14 @@
     header h1:hover {
       border-color: var(--border);
       background: var(--surface-2);
+    }
+
+    .atlas-subtitle {
+      font-size: 10px;
+      letter-spacing: 0.5px;
+      color: var(--text-muted);
+      padding-left: 7px;
+      white-space: nowrap;
     }
 
     header h1.editing {
@@ -1267,7 +1279,10 @@
 <body>
 
 <header>
-  <h1 id="chartTitle" contenteditable="true" spellcheck="false">Gantt Chart Maker</h1>
+  <div class="title-group">
+    <h1 id="chartTitle" contenteditable="true" spellcheck="false">ATLAS</h1>
+    <div class="atlas-subtitle" id="atlasSubtitle">Aligned Timeline Layout And Scheduling</div>
+  </div>
   <div class="date-controls">
     <div class="date-mode-toggle">
       <button class="mode-btn active" id="modeQuarter" data-mode="quarter">Quarter</button>
@@ -1350,7 +1365,7 @@
   <div class="gantt-wrapper" id="ganttWrapper">
     <div class="gantt-container" id="ganttContainer">
       <div class="export-title" id="exportTitle">
-        <div id="exportChartName">Gantt Chart Maker</div>
+        <div id="exportChartName">ATLAS</div>
         <div class="export-date-range" id="exportDateRange"></div>
       </div>
       <div class="gantt-header" id="ganttHeader">
@@ -2490,9 +2505,11 @@ $chartTitle.addEventListener('focus', () => $chartTitle.classList.add('editing')
 $chartTitle.addEventListener('blur', () => {
   $chartTitle.classList.remove('editing');
   const text = $chartTitle.textContent.trim();
-  if (!text) $chartTitle.textContent = 'Gantt Chart Maker';
+  if (!text) $chartTitle.textContent = 'ATLAS';
   document.getElementById('exportChartName').textContent = $chartTitle.textContent;
   document.title = $chartTitle.textContent;
+  document.getElementById('atlasSubtitle').style.display =
+    $chartTitle.textContent.trim().toUpperCase() === 'ATLAS' ? '' : 'none';
 });
 
 $chartTitle.addEventListener('keydown', e => {
@@ -2740,6 +2757,8 @@ function loadConfig(file) {
         document.getElementById('chartTitle').textContent = data.title;
         document.getElementById('exportChartName').textContent = data.title;
         document.title = data.title;
+        document.getElementById('atlasSubtitle').style.display =
+          data.title.trim().toUpperCase() === 'ATLAS' ? '' : 'none';
       }
 
       if (data.labelWidth) {
