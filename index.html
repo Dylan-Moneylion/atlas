@@ -1816,7 +1816,7 @@ function renderGantt() {
     handle.addEventListener('dragstart', e => {
       e.stopPropagation();
       rowDragIdx = rowIdx;
-      dragData = { source: 'reorder' };
+      dragData = { source: 'reorder', taskId: row.task.id, rowIdx };
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', '');
       requestAnimationFrame(() => $row.classList.add('row-dragging'));
@@ -1824,19 +1824,34 @@ function renderGantt() {
     handle.addEventListener('dragend', () => {
       rowDragIdx = null;
       dragData = null;
+      removeGhostRow();
       document.querySelectorAll('.row-dragging, .row-drop-above, .row-drop-below')
         .forEach(el => el.classList.remove('row-dragging', 'row-drop-above', 'row-drop-below'));
     });
 
     $row.addEventListener('dragover', e => {
-      if (rowDragIdx === null) return;
+      if (!dragData || (dragData.source !== 'reorder' && dragData.source !== 'chart')) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
-      document.querySelectorAll('.row-drop-above, .row-drop-below')
-        .forEach(el => el.classList.remove('row-drop-above', 'row-drop-below'));
+      const task = tasks.find(t => t.id === dragData.taskId);
+      if (!task) return;
       const rect = $row.getBoundingClientRect();
       const mid = rect.top + rect.height / 2;
-      $row.classList.add(e.clientY < mid ? 'row-drop-above' : 'row-drop-below');
+      const insertIdx = e.clientY < mid ? rowIdx : rowIdx + 1;
+      if (insertIdx === rowDragIdx || insertIdx === rowDragIdx + 1) {
+        removeGhostRow();
+        if (dragData.source === 'chart') {
+          const origRow = $ganttBody.querySelector(`.gantt-row[data-row-idx="${dragData.rowIdx}"]`);
+          if (origRow) origRow.classList.remove('row-dragging');
+        }
+        return;
+      }
+      if (dragData.source === 'chart') {
+        const origRow = $ganttBody.querySelector(`.gantt-row[data-row-idx="${dragData.rowIdx}"]`);
+        if (origRow) origRow.classList.add('row-dragging');
+      }
+      const startWi = task.startWeek !== null ? task.startWeek : 0;
+      showGhostRow(task, insertIdx, startWi);
     });
 
     $row.addEventListener('dragleave', () => {
@@ -1844,22 +1859,22 @@ function renderGantt() {
     });
 
     $row.addEventListener('drop', e => {
-      if (rowDragIdx === null) return;
+      if (!dragData || (dragData.source !== 'reorder' && dragData.source !== 'chart')) return;
       e.preventDefault();
       e.stopPropagation();
-      const rect = $row.getBoundingClientRect();
-      const mid = rect.top + rect.height / 2;
-      let targetIdx = rowIdx;
-      if (e.clientY >= mid) targetIdx += 1;
-      if (rowDragIdx === targetIdx || rowDragIdx === targetIdx - 1) {
-        rowDragIdx = null;
-        dragData = null;
-        renderGantt();
-        return;
+      const savedGhostIdx = ghostInsertIdx;
+      const savedStartWi = ghostStartWi;
+      removeGhostRow();
+      const task = tasks.find(t => t.id === dragData.taskId);
+      const origIdx = dragData.rowIdx;
+      if (dragData.source === 'chart' && task) {
+        task.startWeek = savedStartWi >= 0 ? savedStartWi : (task.startWeek || 0);
       }
-      const [moved] = chartRows.splice(rowDragIdx, 1);
-      const insertAt = targetIdx > rowDragIdx ? targetIdx - 1 : targetIdx;
-      chartRows.splice(insertAt, 0, moved);
+      if (savedGhostIdx >= 0 && savedGhostIdx !== origIdx && savedGhostIdx !== origIdx + 1) {
+        const [moved] = chartRows.splice(origIdx, 1);
+        const insertAt = savedGhostIdx > origIdx ? savedGhostIdx - 1 : savedGhostIdx;
+        chartRows.splice(insertAt, 0, moved);
+      }
       rowDragIdx = null;
       dragData = null;
       renderGantt();
@@ -1936,13 +1951,16 @@ let rowDragIdx = null;
 let ghostRow = null;
 let ghostInsertIdx = -1;
 let ghostBar = null;
+let ghostStartWi = -1;
 
 function removeGhostRow() {
   if (ghostRow) { ghostRow.remove(); ghostRow = null; ghostBar = null; }
   ghostInsertIdx = -1;
+  ghostStartWi = -1;
 }
 
 function showGhostRow(task, insertIdx, startWi) {
+  ghostStartWi = startWi;
   if (ghostInsertIdx === insertIdx) {
     if (ghostBar) {
       ghostBar.style.left = `calc(${startWi} * (100% / ${weeks.length}))`;
@@ -2053,6 +2071,7 @@ function onBarDragStart(e) {
   const cellWidth = rect.width / weeks.length;
   const grabOffset = Math.floor((e.clientX - rect.left - task.startWeek * cellWidth) / cellWidth);
   dragData = { source: 'chart', taskId: id, rowIdx, grabOffset: Math.max(0, grabOffset) };
+  rowDragIdx = rowIdx;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', '');
   e.currentTarget.style.opacity = '0.4';
@@ -2060,10 +2079,12 @@ function onBarDragStart(e) {
 
 function onDragEnd(e) {
   dragData = null;
+  rowDragIdx = null;
   removeGhostRow();
   document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
   document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
   document.querySelectorAll('.drag-over-add').forEach(el => el.classList.remove('drag-over-add'));
+  document.querySelectorAll('.row-dragging').forEach(el => el.classList.remove('row-dragging'));
   e.currentTarget.style.opacity = '';
 }
 
@@ -2092,7 +2113,7 @@ function highlightWeekSpan(cells, startWi, taskWeeks) {
 }
 
 function onRowDragOver(e) {
-  if (dragData && dragData.source === 'reorder') return;
+  if (!dragData) return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
 
@@ -2100,7 +2121,6 @@ function onRowDragOver(e) {
   const cells = e.currentTarget.querySelectorAll('.week-cell');
   cells.forEach(c => c.classList.remove('drag-over'));
 
-  if (!dragData) return;
   const task = tasks.find(t => t.id === dragData.taskId);
   if (!task) return;
 
@@ -2112,9 +2132,37 @@ function onRowDragOver(e) {
     const wi = getWeekFromX(e, e.currentTarget);
     const startWi = Math.max(0, Math.min(wi, weeks.length - task.weeks));
     showGhostRow(task, insertIdx, startWi);
-  } else {
+  } else if (dragData.source === 'chart') {
+    e.stopPropagation();
+    const currentRowIdx = parseInt($row.dataset.rowIdx);
+    const rect = $row.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    const insertIdx = e.clientY < mid ? currentRowIdx : currentRowIdx + 1;
     const startWi = getDropStartWeek(e, e.currentTarget);
-    highlightWeekSpan(cells, startWi, task.weeks);
+
+    if (insertIdx === rowDragIdx || insertIdx === rowDragIdx + 1) {
+      removeGhostRow();
+      const origRow = $ganttBody.querySelector(`.gantt-row[data-row-idx="${dragData.rowIdx}"]`);
+      if (origRow) origRow.classList.remove('row-dragging');
+      highlightWeekSpan(cells, startWi, task.weeks);
+    } else {
+      const origRow = $ganttBody.querySelector(`.gantt-row[data-row-idx="${dragData.rowIdx}"]`);
+      if (origRow) origRow.classList.add('row-dragging');
+      showGhostRow(task, insertIdx, startWi);
+    }
+  } else if (dragData.source === 'reorder') {
+    e.stopPropagation();
+    const currentRowIdx = parseInt($row.dataset.rowIdx);
+    const rect = $row.getBoundingClientRect();
+    const mid = rect.top + rect.height / 2;
+    const insertIdx = e.clientY < mid ? currentRowIdx : currentRowIdx + 1;
+
+    if (insertIdx === rowDragIdx || insertIdx === rowDragIdx + 1) {
+      removeGhostRow();
+      return;
+    }
+    const startWi = task.startWeek !== null ? task.startWeek : 0;
+    showGhostRow(task, insertIdx, startWi);
   }
 }
 
@@ -2124,20 +2172,49 @@ function onRowDragLeave(e) {
 
 function onRowDrop(e, rowIdx) {
   e.preventDefault();
+
+  if (dragData && (dragData.source === 'reorder' || dragData.source === 'chart')) {
+    e.stopPropagation();
+    const savedGhostIdx = ghostInsertIdx;
+    const savedStartWi = ghostStartWi;
+    removeGhostRow();
+
+    const task = tasks.find(t => t.id === dragData.taskId);
+    if (!task) { rowDragIdx = null; dragData = null; renderGantt(); return; }
+    const origIdx = dragData.rowIdx;
+
+    if (dragData.source === 'chart') {
+      const startWi = savedGhostIdx >= 0 && savedStartWi >= 0
+        ? savedStartWi
+        : getDropStartWeek(e, e.currentTarget);
+      if (startWi + task.weeks > weeks.length) {
+        showToast(`Not enough room — task needs ${task.weeks}w but only ${weeks.length - startWi} left`);
+        rowDragIdx = null; dragData = null; renderGantt(); return;
+      }
+      task.startWeek = startWi;
+    }
+
+    if (savedGhostIdx >= 0 && savedGhostIdx !== origIdx && savedGhostIdx !== origIdx + 1) {
+      const [moved] = chartRows.splice(origIdx, 1);
+      const insertAt = savedGhostIdx > origIdx ? savedGhostIdx - 1 : savedGhostIdx;
+      chartRows.splice(insertAt, 0, moved);
+    }
+
+    rowDragIdx = null;
+    dragData = null;
+    renderGantt();
+    return;
+  }
+
   const savedGhostIdx = ghostInsertIdx;
   removeGhostRow();
-  if (!dragData || dragData.source === 'reorder') return;
+  if (!dragData) return;
 
   const task = tasks.find(t => t.id === dragData.taskId);
   if (!task) return;
 
-  let startWi;
-  if (dragData.source === 'chart') {
-    startWi = getDropStartWeek(e, e.currentTarget);
-  } else {
-    const raw = getWeekFromX(e, e.currentTarget);
-    startWi = Math.max(0, Math.min(raw, weeks.length - task.weeks));
-  }
+  const raw = getWeekFromX(e, e.currentTarget);
+  const startWi = Math.max(0, Math.min(raw, weeks.length - task.weeks));
 
   if (startWi + task.weeks > weeks.length) {
     showToast(`Not enough room — task needs ${task.weeks}w but only ${weeks.length - startWi} left`);
@@ -2150,8 +2227,6 @@ function onRowDrop(e, rowIdx) {
     task.placed = true;
     task.startWeek = startWi;
     chartRows.splice(insertIdx, 0, { task });
-  } else if (dragData.source === 'chart') {
-    task.startWeek = startWi;
   }
 
   dragData = null;
@@ -2161,26 +2236,65 @@ function onRowDrop(e, rowIdx) {
 
 /* ── Ghost-row fallback: events pass through pointer-events:none ghost to ganttBody ── */
 $ganttBody.addEventListener('dragover', e => {
-  if (!ghostRow || !dragData || dragData.source !== 'bank') return;
+  if (!ghostRow || !dragData) return;
+  if (dragData.source !== 'bank' && dragData.source !== 'chart' && dragData.source !== 'reorder') return;
   e.preventDefault();
   e.dataTransfer.dropEffect = 'move';
   const task = tasks.find(t => t.id === dragData.taskId);
-  if (task && ghostBar) {
+  if (task && ghostBar && dragData.source !== 'reorder') {
     const rowCells = ghostRow.querySelector('.row-cells');
     if (rowCells) {
       const rect = rowCells.getBoundingClientRect();
       const x = e.clientX - rect.left;
       const cellWidth = rect.width / weeks.length;
-      const wi = Math.max(0, Math.min(weeks.length - 1, Math.floor(x / cellWidth)));
+      let wi;
+      if (dragData.source === 'chart') {
+        const offset = dragData.grabOffset || 0;
+        wi = Math.max(0, Math.floor(x / cellWidth) - offset);
+      } else {
+        wi = Math.max(0, Math.min(weeks.length - 1, Math.floor(x / cellWidth)));
+      }
       const startWi = Math.max(0, Math.min(wi, weeks.length - task.weeks));
       ghostBar.style.left = `calc(${startWi} * (100% / ${weeks.length}))`;
       ghostBar.style.width = `calc(${task.weeks} * (100% / ${weeks.length}) - 4px)`;
+      ghostStartWi = startWi;
     }
   }
 });
 
 $ganttBody.addEventListener('drop', e => {
-  if (ghostInsertIdx < 0 || !dragData || dragData.source !== 'bank') return;
+  if (ghostInsertIdx < 0 || !dragData) return;
+
+  if (dragData.source === 'chart' || dragData.source === 'reorder') {
+    e.preventDefault();
+    const task = tasks.find(t => t.id === dragData.taskId);
+    if (!task) { removeGhostRow(); rowDragIdx = null; dragData = null; renderGantt(); return; }
+    const origIdx = dragData.rowIdx;
+    const insertIdx = ghostInsertIdx;
+    const savedStartWi = ghostStartWi;
+    removeGhostRow();
+
+    if (dragData.source === 'chart') {
+      const startWi = savedStartWi >= 0 ? savedStartWi : (task.startWeek || 0);
+      if (startWi + task.weeks > weeks.length) {
+        showToast(`Not enough room — task needs ${task.weeks}w but only ${weeks.length - startWi} left`);
+        rowDragIdx = null; dragData = null; renderGantt(); return;
+      }
+      task.startWeek = startWi;
+    }
+
+    if (insertIdx !== origIdx && insertIdx !== origIdx + 1) {
+      const [moved] = chartRows.splice(origIdx, 1);
+      const insertAt = insertIdx > origIdx ? insertIdx - 1 : insertIdx;
+      chartRows.splice(insertAt, 0, moved);
+    }
+
+    rowDragIdx = null; dragData = null;
+    renderGantt(); renderTaskBank();
+    return;
+  }
+
+  if (dragData.source !== 'bank') return;
   e.preventDefault();
   const task = tasks.find(t => t.id === dragData.taskId);
   if (!task) { removeGhostRow(); dragData = null; return; }
@@ -2215,8 +2329,18 @@ $ganttBody.addEventListener('drop', e => {
 /* ── Drop on add-row zone ── */
 $ganttAddRow.addEventListener('dragover', e => {
   e.preventDefault();
-  removeGhostRow();
-  if (dragData && dragData.source === 'bank') {
+  if (dragData && (dragData.source === 'reorder' || dragData.source === 'chart')) {
+    const task = tasks.find(t => t.id === dragData.taskId);
+    if (task) {
+      if (dragData.source === 'chart') {
+        const origRow = $ganttBody.querySelector(`.gantt-row[data-row-idx="${dragData.rowIdx}"]`);
+        if (origRow) origRow.classList.add('row-dragging');
+      }
+      const startWi = task.startWeek !== null ? task.startWeek : 0;
+      showGhostRow(task, chartRows.length, startWi);
+    }
+  } else if (dragData && dragData.source === 'bank') {
+    removeGhostRow();
     $ganttAddRow.classList.add('drag-over-add');
   }
 });
@@ -2228,6 +2352,27 @@ $ganttAddRow.addEventListener('dragleave', () => {
 $ganttAddRow.addEventListener('drop', e => {
   e.preventDefault();
   $ganttAddRow.classList.remove('drag-over-add');
+
+  if (dragData && (dragData.source === 'reorder' || dragData.source === 'chart')) {
+    const savedGhostIdx = ghostInsertIdx;
+    const savedStartWi = ghostStartWi;
+    removeGhostRow();
+    const task = tasks.find(t => t.id === dragData.taskId);
+    if (!task) { rowDragIdx = null; dragData = null; renderGantt(); return; }
+    const origIdx = dragData.rowIdx;
+    if (dragData.source === 'chart') {
+      task.startWeek = savedStartWi >= 0 ? savedStartWi : (task.startWeek || 0);
+    }
+    if (savedGhostIdx >= 0 && savedGhostIdx !== origIdx && savedGhostIdx !== origIdx + 1) {
+      const [moved] = chartRows.splice(origIdx, 1);
+      const insertAt = savedGhostIdx > origIdx ? savedGhostIdx - 1 : savedGhostIdx;
+      chartRows.splice(insertAt, 0, moved);
+    }
+    rowDragIdx = null; dragData = null;
+    renderGantt();
+    return;
+  }
+
   if (!dragData || dragData.source !== 'bank') return;
 
   const task = tasks.find(t => t.id === dragData.taskId);
