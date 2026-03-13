@@ -2275,11 +2275,9 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
       if (!menu.contains(ev.target)) {
         closeSegmentMenu();
         document.removeEventListener('click', closeFn);
-        document.removeEventListener('contextmenu', closeFn);
       }
     };
     document.addEventListener('click', closeFn);
-    document.addEventListener('contextmenu', closeFn);
   }, 0);
 }
 
