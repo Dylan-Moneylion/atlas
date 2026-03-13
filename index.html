@@ -2157,14 +2157,8 @@ function createTaskBar(task, rowIdx) {
 
   const barLabel = document.createElement('span');
   barLabel.className = 'bar-label';
-  barLabel.textContent = task.name;
+  barLabel.textContent = task.phase || '';
   bar.appendChild(barLabel);
-
-  barLabel.addEventListener('dblclick', e => {
-    e.stopPropagation();
-    bar.draggable = false;
-    startRename(barLabel, task, () => { bar.draggable = true; });
-  });
 
   bar.addEventListener('contextmenu', e => {
     e.preventDefault();
@@ -2260,19 +2254,21 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
     splitWeek = Math.max(1, Math.min(clickWeek - task.startWeek, task.weeks - 1));
   }
 
-  if (segIdx === -1 && task.weeks >= 2) {
-    const splitItem = document.createElement('div');
-    splitItem.className = 'menu-item';
-    splitItem.textContent = `Split at week ${splitWeek} / ${task.weeks}`;
-    splitItem.addEventListener('click', () => {
-      closeSegmentMenu();
-      task.segments = [
-        { label: task.name, color: task.color, weeks: splitWeek },
-        { label: task.name, color: task.color, weeks: task.weeks - splitWeek },
-      ];
-      renderGantt();
-    });
-    menu.appendChild(splitItem);
+  if (segIdx === -1) {
+    if (task.weeks >= 2) {
+      const splitItem = document.createElement('div');
+      splitItem.className = 'menu-item';
+      splitItem.textContent = `Split at week ${splitWeek} / ${task.weeks}`;
+      splitItem.addEventListener('click', () => {
+        closeSegmentMenu();
+        task.segments = [
+          { label: '', color: task.color, weeks: splitWeek },
+          { label: '', color: task.color, weeks: task.weeks - splitWeek },
+        ];
+        renderGantt();
+      });
+      menu.appendChild(splitItem);
+    }
 
     const divider = document.createElement('div');
     divider.className = 'menu-divider';
@@ -2280,7 +2276,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
 
     const lbl = document.createElement('div');
     lbl.className = 'menu-label';
-    lbl.textContent = 'Quick split by phase';
+    lbl.textContent = 'Set phase';
     menu.appendChild(lbl);
 
     PHASE_TYPES.forEach(phase => {
@@ -2289,14 +2285,23 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
       item.innerHTML = `<span class="phase-dot" style="background:${phase.color}"></span>${phase.label}`;
       item.addEventListener('click', () => {
         closeSegmentMenu();
-        task.segments = [
-          { label: task.name, color: task.color, weeks: splitWeek },
-          { label: phase.label, color: task.color, weeks: task.weeks - splitWeek },
-        ];
+        task.phase = phase.label;
         renderGantt();
       });
       menu.appendChild(item);
     });
+
+    if (task.phase) {
+      const clearItem = document.createElement('div');
+      clearItem.className = 'menu-item';
+      clearItem.textContent = '✕ Clear phase';
+      clearItem.addEventListener('click', () => {
+        closeSegmentMenu();
+        delete task.phase;
+        renderGantt();
+      });
+      menu.appendChild(clearItem);
+    }
   } else {
     const seg = task.segments[segIdx];
 
@@ -2316,7 +2321,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
       splitItem.addEventListener('click', () => {
         closeSegmentMenu();
         const newSeg = {
-          label: seg.label,
+          label: '',
           color: seg.color,
           weeks: seg.weeks - segSplitAt,
         };
@@ -2502,7 +2507,7 @@ function showGhostRow(task, insertIdx, startWi) {
   }
   const barLabel = document.createElement('span');
   barLabel.className = 'bar-label';
-  barLabel.textContent = task.name;
+  barLabel.textContent = task.phase || '';
   bar.appendChild(barLabel);
   cellsDiv.appendChild(bar);
 
