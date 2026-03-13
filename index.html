@@ -1086,6 +1086,56 @@
       flex-shrink: 0;
     }
 
+    /* Phase filter bar */
+    .phase-filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .phase-filter-bar .filter-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-right: 4px;
+    }
+
+    .phase-filter-btn {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+
+    .phase-filter-btn:hover {
+      color: var(--text);
+      border-color: var(--text-muted);
+    }
+
+    .phase-filter-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+
+    .gantt-row.phase-dimmed {
+      opacity: 0.18;
+      transition: opacity 0.2s;
+    }
+
+    .task-bar .segment.seg-dimmed {
+      opacity: 0.25;
+      transition: opacity 0.2s;
+    }
+
     /* Drop zone (full row) */
     .drop-row-zone {
       position: absolute;
@@ -1331,7 +1381,8 @@
     .exporting .gantt-add-row,
     .exporting .remove-row-btn,
     .exporting .note-placeholder,
-    .exporting .resize-handle {
+    .exporting .resize-handle,
+    .exporting .phase-filter-bar {
       display: none !important;
     }
 
@@ -1473,6 +1524,9 @@
         <div id="exportChartName">ATLAS</div>
         <div class="export-date-range" id="exportDateRange"></div>
       </div>
+      <div class="phase-filter-bar" id="phaseFilterBar">
+        <span class="filter-label">Phase</span>
+      </div>
       <div class="gantt-header" id="ganttHeader">
         <div class="row-label-spacer">Tasks<div class="label-resize-handle" id="labelResizeHandle"></div></div>
         <div class="week-columns" id="weekHeaders"></div>
@@ -1527,6 +1581,7 @@ let weekNotes = {};
 let categories = [];
 let selectedColor = COLORS[0];
 let nextId = 1;
+let activePhaseFilter = null;
 
 const $startDate = document.getElementById('startDate');
 const $endDate = document.getElementById('endDate');
@@ -1537,6 +1592,64 @@ const $ganttAddRow = document.getElementById('ganttAddRow');
 const $noteCells = document.getElementById('noteCells');
 const $undoBtn = document.getElementById('undoBtn');
 const $redoBtn = document.getElementById('redoBtn');
+const $phaseFilterBar = document.getElementById('phaseFilterBar');
+
+function buildPhaseFilter() {
+  $phaseFilterBar.querySelectorAll('.phase-filter-btn').forEach(b => b.remove());
+  PHASE_TYPES.forEach(phase => {
+    const btn = document.createElement('button');
+    btn.className = 'phase-filter-btn' + (activePhaseFilter === phase.label ? ' active' : '');
+    btn.textContent = phase.label;
+    btn.addEventListener('click', () => {
+      activePhaseFilter = activePhaseFilter === phase.label ? null : phase.label;
+      buildPhaseFilter();
+      applyPhaseFilter();
+    });
+    $phaseFilterBar.appendChild(btn);
+  });
+}
+
+function taskMatchesPhase(task, phase) {
+  if (task.phase === phase) return true;
+  if (task.segments) {
+    return task.segments.some(seg => seg.label === phase);
+  }
+  return false;
+}
+
+function applyPhaseFilter() {
+  const rows = $ganttBody.querySelectorAll('.gantt-row:not(.ghost-row)');
+  rows.forEach((rowEl, i) => {
+    const row = chartRows[i];
+    if (!row) return;
+    const task = row.task;
+    const bar = rowEl.querySelector('.task-bar');
+
+    rowEl.classList.remove('phase-dimmed');
+    if (bar) bar.querySelectorAll('.segment').forEach(s => s.classList.remove('seg-dimmed'));
+
+    if (!activePhaseFilter) return;
+
+    if (task.segments && task.segments.length) {
+      const anyMatch = task.segments.some(seg => seg.label === activePhaseFilter);
+      if (!anyMatch) {
+        rowEl.classList.add('phase-dimmed');
+      } else if (bar) {
+        bar.querySelectorAll('.segment').forEach((segEl, si) => {
+          if (task.segments[si] && task.segments[si].label !== activePhaseFilter) {
+            segEl.classList.add('seg-dimmed');
+          }
+        });
+      }
+    } else {
+      if (task.phase !== activePhaseFilter) {
+        rowEl.classList.add('phase-dimmed');
+      }
+    }
+  });
+}
+
+buildPhaseFilter();
 
 /* ── Undo / Redo system ── */
 let undoStack = [];
@@ -2140,6 +2253,7 @@ function renderGantt() {
     $ganttBody.appendChild($row);
   });
   recordUndo();
+  applyPhaseFilter();
 }
 
 function createTaskBar(task, rowIdx) {
