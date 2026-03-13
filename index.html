@@ -1092,19 +1092,37 @@
     /* Phase filter bar */
     .phase-filter-bar {
       display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
     }
 
     .phase-filter-bar .filter-label {
-      font-size: 11px;
+      min-width: var(--label-width);
+      max-width: var(--label-width);
+      font-size: 12px;
+      font-weight: 600;
       color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-right: 4px;
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      border-right: 1px solid var(--border);
+      position: sticky;
+      left: 0;
+      z-index: 3;
+      background: var(--surface);
+    }
+
+    .phase-filter-btns {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      position: sticky;
+      left: var(--label-width);
+      z-index: 3;
+      background: var(--surface);
     }
 
     .phase-filter-btn {
@@ -1427,6 +1445,8 @@
       .sidebar { width: 220px; min-width: 220px; }
       .gantt-header .row-label-spacer,
       .gantt-row .row-label { min-width: var(--label-width); max-width: var(--label-width); }
+      .phase-filter-bar .filter-label { min-width: var(--label-width); max-width: var(--label-width); }
+      .phase-filter-btns { left: var(--label-width); }
       .week-col-header, .week-cell, .note-cell { min-width: 85px; }
       .notes-row .row-label { min-width: var(--label-width); max-width: var(--label-width); }
     }
@@ -1529,6 +1549,7 @@
       </div>
       <div class="phase-filter-bar" id="phaseFilterBar">
         <span class="filter-label">Phase</span>
+        <div class="phase-filter-btns" id="phaseFilterBtns"></div>
       </div>
       <div class="gantt-header" id="ganttHeader">
         <div class="row-label-spacer">Tasks<div class="label-resize-handle" id="labelResizeHandle"></div></div>
@@ -1598,7 +1619,8 @@ const $redoBtn = document.getElementById('redoBtn');
 const $phaseFilterBar = document.getElementById('phaseFilterBar');
 
 function buildPhaseFilter() {
-  $phaseFilterBar.querySelectorAll('.phase-filter-btn').forEach(b => b.remove());
+  const $btns = document.getElementById('phaseFilterBtns');
+  $btns.innerHTML = '';
   PHASE_TYPES.forEach(phase => {
     const btn = document.createElement('button');
     btn.className = 'phase-filter-btn' + (activePhaseFilter === phase.label ? ' active' : '');
@@ -1608,7 +1630,7 @@ function buildPhaseFilter() {
       buildPhaseFilter();
       applyPhaseFilter();
     });
-    $phaseFilterBar.appendChild(btn);
+    $btns.appendChild(btn);
   });
 }
 
