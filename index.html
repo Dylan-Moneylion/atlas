@@ -690,7 +690,7 @@
     }
 
     .week-col-header {
-      min-width: 110px;
+      min-width: 140px;
       flex: 1;
       text-align: center;
       padding: 8px 6px;
@@ -895,7 +895,7 @@
     }
 
     .week-cell {
-      min-width: 110px;
+      min-width: 140px;
       flex: 1;
       border-right: 1px solid var(--grid-line);
       position: relative;
@@ -987,6 +987,96 @@
     .task-bar .resize-handle.left { left: 0; }
     .task-bar .resize-handle.right { right: 0; }
 
+    /* Segmented task bars */
+    .task-bar.segmented { padding: 0; }
+
+    .task-bar.segmented .bar-label { display: none; }
+
+    .task-bar .segment {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      align-self: stretch;
+      padding: 2px 4px;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    .task-bar .segment .seg-label {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10px;
+      font-weight: 600;
+      color: #fff;
+      line-height: 1.3;
+      text-align: center;
+      flex: 1;
+      cursor: grab;
+    }
+
+    .task-bar .segment-divider {
+      width: 2px;
+      margin: 0 -1px;
+      align-self: stretch;
+      cursor: col-resize;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 2;
+      background: rgba(0,0,0,0.6);
+      transition: background 0.12s;
+    }
+
+    .task-bar .segment-divider:hover {
+      background: rgba(255,255,255,0.9);
+    }
+
+    .segment-menu {
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      z-index: 200;
+      padding: 4px 0;
+      min-width: 160px;
+      animation: fadeIn 0.12s;
+    }
+
+    .segment-menu .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px;
+      font-size: 12px;
+      color: var(--text);
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .segment-menu .menu-item:hover { background: var(--surface-2); }
+
+    .segment-menu .menu-divider {
+      height: 1px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .segment-menu .menu-label {
+      padding: 4px 12px 2px;
+      font-size: 10px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .segment-menu .phase-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
     /* Drop zone (full row) */
     .drop-row-zone {
       position: absolute;
@@ -1074,7 +1164,7 @@
     }
 
     .note-cell {
-      min-width: 110px;
+      min-width: 140px;
       flex: 1;
       border-right: 1px solid var(--grid-line);
       padding: 6px 8px;
@@ -1390,6 +1480,14 @@ const COLORS = [
   '#6c5ce7','#00b894','#e17055','#0984e3','#fdcb6e',
   '#e84393','#00cec9','#d63031','#636e72','#a29bfe',
   '#55efc4','#fab1a0','#74b9ff','#ffeaa7','#fd79a8',
+];
+
+const PHASE_TYPES = [
+  { label: 'Product', color: '#fdcb6e' },
+  { label: 'Design', color: '#e84393' },
+  { label: 'Engineering', color: '#0984e3' },
+  { label: 'Data', color: '#00cec9' },
+  { label: 'QA', color: '#00b894' },
 ];
 
 let tasks = [];
@@ -1907,8 +2005,9 @@ function renderGantt() {
 }
 
 function createTaskBar(task, rowIdx) {
+  const hasSegs = task.segments && task.segments.length;
   const bar = document.createElement('div');
-  bar.className = 'task-bar';
+  bar.className = 'task-bar' + (hasSegs ? ' segmented' : '');
   bar.style.background = task.color;
   bar.style.left = `calc(${task.startWeek} * (100% / ${weeks.length}))`;
   bar.style.width = `calc(${task.weeks} * (100% / ${weeks.length}) - 4px)`;
@@ -1916,16 +2015,62 @@ function createTaskBar(task, rowIdx) {
   bar.dataset.taskId = task.id;
   bar.dataset.rowIdx = rowIdx;
 
+  if (hasSegs) {
+    task.segments.forEach((seg, si) => {
+      if (si > 0) {
+        const divider = document.createElement('div');
+        divider.className = 'segment-divider';
+        divider.addEventListener('mousedown', e => onDividerResize(e, task, si - 1));
+        bar.appendChild(divider);
+      }
+      const segDiv = document.createElement('div');
+      segDiv.className = 'segment';
+      segDiv.style.flex = seg.weeks;
+      const segLabel = document.createElement('span');
+      segLabel.className = 'seg-label';
+      segLabel.textContent = seg.label;
+      segDiv.appendChild(segLabel);
+      segLabel.addEventListener('dblclick', e => {
+        e.stopPropagation();
+        bar.draggable = false;
+        startSegmentRename(segLabel, task, si, () => { bar.draggable = true; });
+      });
+      segDiv.addEventListener('contextmenu', e => {
+        e.preventDefault();
+        e.stopPropagation();
+        showSegmentMenu(e, task, si, rowIdx);
+      });
+      bar.appendChild(segDiv);
+    });
+  }
+
   const barLabel = document.createElement('span');
   barLabel.className = 'bar-label';
   barLabel.textContent = task.name;
   bar.appendChild(barLabel);
 
-
   barLabel.addEventListener('dblclick', e => {
     e.stopPropagation();
     bar.draggable = false;
     startRename(barLabel, task, () => { bar.draggable = true; });
+  });
+
+  bar.addEventListener('contextmenu', e => {
+    e.preventDefault();
+    if (hasSegs) {
+      const segments = bar.querySelectorAll('.segment');
+      let closestIdx = 0;
+      let closestDist = Infinity;
+      segments.forEach((s, i) => {
+        const r = s.getBoundingClientRect();
+        const center = r.left + r.width / 2;
+        const dist = Math.abs(e.clientX - center);
+        if (dist < closestDist) { closestDist = dist; closestIdx = i; }
+      });
+      showSegmentMenu(e, task, closestIdx, rowIdx);
+    } else {
+      showSegmentMenu(e, task, -1, rowIdx);
+    }
   });
 
   bar.addEventListener('dragstart', onBarDragStart);
@@ -1943,6 +2088,235 @@ function createTaskBar(task, rowIdx) {
   bar.appendChild(rightHandle);
 
   return bar;
+}
+
+function startSegmentRename(el, task, segIdx, onDone) {
+  const seg = task.segments[segIdx];
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'rename-input';
+  input.value = seg.label;
+  input.style.fontSize = '10px';
+  input.style.textAlign = 'center';
+
+  const original = el.textContent;
+  el.textContent = '';
+  el.appendChild(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+  const commit = () => {
+    if (committed) return;
+    committed = true;
+    const val = input.value.trim();
+    if (val && val !== seg.label) {
+      seg.label = val;
+      renderGantt();
+    } else {
+      el.textContent = original;
+    }
+    if (onDone) onDone();
+  };
+
+  input.addEventListener('blur', commit);
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); input.blur(); }
+    if (e.key === 'Escape') { input.value = original; input.blur(); }
+  });
+  input.addEventListener('mousedown', e => e.stopPropagation());
+  input.addEventListener('dragstart', e => e.preventDefault());
+}
+
+function closeSegmentMenu() {
+  const existing = document.getElementById('segmentMenu');
+  if (existing) existing.remove();
+}
+
+function showSegmentMenu(e, task, segIdx, rowIdx) {
+  closeSegmentMenu();
+  const menu = document.createElement('div');
+  menu.className = 'segment-menu';
+  menu.id = 'segmentMenu';
+
+  // Compute split week at right-click time so scroll changes don't affect it
+  const rowCells = document.querySelector(`.gantt-row[data-row-idx="${rowIdx}"] .row-cells`);
+  let splitWeek = Math.floor(task.weeks / 2);
+  if (rowCells) {
+    const rect = rowCells.getBoundingClientRect();
+    const cellWidth = rect.width / weeks.length;
+    const clickWeek = Math.floor((e.clientX - rect.left) / cellWidth);
+    splitWeek = Math.max(1, Math.min(clickWeek - task.startWeek, task.weeks - 1));
+  }
+
+  if (segIdx === -1 && task.weeks >= 2) {
+    const splitItem = document.createElement('div');
+    splitItem.className = 'menu-item';
+    splitItem.textContent = `Split at week ${splitWeek} / ${task.weeks}`;
+    splitItem.addEventListener('click', () => {
+      closeSegmentMenu();
+      task.segments = [
+        { label: task.name, color: task.color, weeks: splitWeek },
+        { label: task.name, color: task.color, weeks: task.weeks - splitWeek },
+      ];
+      renderGantt();
+    });
+    menu.appendChild(splitItem);
+
+    const divider = document.createElement('div');
+    divider.className = 'menu-divider';
+    menu.appendChild(divider);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'menu-label';
+    lbl.textContent = 'Quick split by phase';
+    menu.appendChild(lbl);
+
+    PHASE_TYPES.forEach(phase => {
+      const item = document.createElement('div');
+      item.className = 'menu-item';
+      item.innerHTML = `<span class="phase-dot" style="background:${phase.color}"></span>${phase.label}`;
+      item.addEventListener('click', () => {
+        closeSegmentMenu();
+        task.segments = [
+          { label: task.name, color: task.color, weeks: splitWeek },
+          { label: phase.label, color: task.color, weeks: task.weeks - splitWeek },
+        ];
+        renderGantt();
+      });
+      menu.appendChild(item);
+    });
+  } else {
+    const seg = task.segments[segIdx];
+
+    if (seg.weeks >= 2) {
+      let segSplitAt = Math.floor(seg.weeks / 2);
+      if (rowCells) {
+        let segStartWeek = task.startWeek;
+        for (let i = 0; i < segIdx; i++) segStartWeek += task.segments[i].weeks;
+        const rect = rowCells.getBoundingClientRect();
+        const cellWidth = rect.width / weeks.length;
+        const clickWeek = Math.floor((e.clientX - rect.left) / cellWidth);
+        segSplitAt = Math.max(1, Math.min(clickWeek - segStartWeek, seg.weeks - 1));
+      }
+      const splitItem = document.createElement('div');
+      splitItem.className = 'menu-item';
+      splitItem.textContent = `Split at week ${segSplitAt} / ${seg.weeks}`;
+      splitItem.addEventListener('click', () => {
+        closeSegmentMenu();
+        const newSeg = {
+          label: seg.label,
+          color: seg.color,
+          weeks: seg.weeks - segSplitAt,
+        };
+        seg.weeks = segSplitAt;
+        task.segments.splice(segIdx + 1, 0, newSeg);
+        renderGantt();
+      });
+      menu.appendChild(splitItem);
+    }
+
+    if (task.segments.length > 1) {
+      const removeItem = document.createElement('div');
+      removeItem.className = 'menu-item';
+      removeItem.textContent = '✕ Remove segment';
+      removeItem.addEventListener('click', () => {
+        closeSegmentMenu();
+        const removedWeeks = seg.weeks;
+        task.segments.splice(segIdx, 1);
+        const neighbor = segIdx < task.segments.length
+          ? task.segments[segIdx]
+          : task.segments[segIdx - 1];
+        neighbor.weeks += removedWeeks;
+        if (task.segments.length === 1) {
+          task.color = task.segments[0].color;
+          delete task.segments;
+        }
+        renderGantt();
+      });
+      menu.appendChild(removeItem);
+    }
+
+    const divider = document.createElement('div');
+    divider.className = 'menu-divider';
+    menu.appendChild(divider);
+
+    const lbl = document.createElement('div');
+    lbl.className = 'menu-label';
+    lbl.textContent = 'Set phase type';
+    menu.appendChild(lbl);
+
+    PHASE_TYPES.forEach(phase => {
+      const item = document.createElement('div');
+      item.className = 'menu-item';
+      item.innerHTML = `<span class="phase-dot" style="background:${phase.color}"></span>${phase.label}`;
+      item.addEventListener('click', () => {
+        closeSegmentMenu();
+        seg.label = phase.label;
+        seg.color = phase.color;
+        renderGantt();
+      });
+      menu.appendChild(item);
+    });
+  }
+
+  menu.style.left = e.clientX + 'px';
+  menu.style.top = e.clientY + 'px';
+  document.body.appendChild(menu);
+
+  requestAnimationFrame(() => {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+    if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+  });
+
+  setTimeout(() => {
+    const closeFn = ev => {
+      if (!menu.contains(ev.target)) {
+        closeSegmentMenu();
+        document.removeEventListener('click', closeFn);
+        document.removeEventListener('contextmenu', closeFn);
+      }
+    };
+    document.addEventListener('click', closeFn);
+    document.addEventListener('contextmenu', closeFn);
+  }, 0);
+}
+
+function onDividerResize(e, task, dividerIdx) {
+  e.preventDefault();
+  e.stopPropagation();
+
+  const rowCells = e.target.closest('.row-cells');
+  const rect = rowCells.getBoundingClientRect();
+  const cellWidth = rect.width / weeks.length;
+
+  const leftSeg = task.segments[dividerIdx];
+  const rightSeg = task.segments[dividerIdx + 1];
+  const totalWeeks = leftSeg.weeks + rightSeg.weeks;
+
+  let segStart = task.startWeek;
+  for (let i = 0; i < dividerIdx; i++) segStart += task.segments[i].weeks;
+
+  const onMouseMove = ev => {
+    const x = ev.clientX - rect.left;
+    const hoverWeek = Math.max(0, Math.min(weeks.length - 1, Math.floor(x / cellWidth)));
+    const newLeftWeeks = hoverWeek - segStart;
+    const newRightWeeks = totalWeeks - newLeftWeeks;
+    if (newLeftWeeks >= 1 && newRightWeeks >= 1 && leftSeg.weeks !== newLeftWeeks) {
+      leftSeg.weeks = newLeftWeeks;
+      rightSeg.weeks = newRightWeeks;
+      renderGantt();
+    }
+  };
+
+  const onMouseUp = () => {
+    document.removeEventListener('mousemove', onMouseMove);
+    document.removeEventListener('mouseup', onMouseUp);
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup', onMouseUp);
 }
 
 /* ── Drag from bank ── */
@@ -1995,10 +2369,28 @@ function showGhostRow(task, insertIdx, startWi) {
   });
 
   const bar = document.createElement('div');
-  bar.className = 'task-bar';
+  const hasSegs = task.segments && task.segments.length;
+  bar.className = 'task-bar' + (hasSegs ? ' segmented' : '');
   bar.style.background = task.color;
   bar.style.left = `calc(${startWi} * (100% / ${weeks.length}))`;
   bar.style.width = `calc(${task.weeks} * (100% / ${weeks.length}) - 4px)`;
+  if (hasSegs) {
+    task.segments.forEach((seg, si) => {
+      if (si > 0) {
+        const d = document.createElement('div');
+        d.className = 'segment-divider';
+        bar.appendChild(d);
+      }
+      const s = document.createElement('div');
+      s.className = 'segment';
+      s.style.flex = seg.weeks;
+      const l = document.createElement('span');
+      l.className = 'seg-label';
+      l.textContent = seg.label;
+      s.appendChild(l);
+      bar.appendChild(s);
+    });
+  }
   const barLabel = document.createElement('span');
   barLabel.className = 'bar-label';
   barLabel.textContent = task.name;
@@ -2401,6 +2793,7 @@ function onResizeStart(e, task, side) {
   const rowCells = e.target.closest('.row-cells');
   const rect = rowCells.getBoundingClientRect();
   const cellWidth = rect.width / weeks.length;
+  const hasSegs = task.segments && task.segments.length;
 
   const onMouseMove = (ev) => {
     const x = ev.clientX - rect.left;
@@ -2410,6 +2803,12 @@ function onResizeStart(e, task, side) {
       const newWeeks = hoverWeek - task.startWeek + 1;
       if (newWeeks >= 1 && task.startWeek + newWeeks <= weeks.length) {
         if (task.weeks !== newWeeks) {
+          const delta = newWeeks - task.weeks;
+          if (hasSegs) {
+            const last = task.segments[task.segments.length - 1];
+            if (last.weeks + delta < 1) return;
+            last.weeks += delta;
+          }
           task.weeks = newWeeks;
           renderGantt();
         }
@@ -2419,6 +2818,12 @@ function onResizeStart(e, task, side) {
       if (hoverWeek >= 0 && hoverWeek <= endWeek) {
         const newWeeks = endWeek - hoverWeek + 1;
         if (task.weeks !== newWeeks || task.startWeek !== hoverWeek) {
+          const delta = newWeeks - task.weeks;
+          if (hasSegs) {
+            const first = task.segments[0];
+            if (first.weeks + delta < 1) return;
+            first.weeks += delta;
+          }
           task.weeks = newWeeks;
           task.startWeek = hoverWeek;
           renderGantt();
@@ -2745,11 +3150,24 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
       weeks.forEach(() => r.push(''));
       data.push(r);
 
-      if (t.startWeek !== null && t.weeks > 1) {
-        merges.push({
-          s: { r: ri + 1, c: t.startWeek + 3 },
-          e: { r: ri + 1, c: t.startWeek + t.weeks - 1 + 3 },
-        });
+      if (t.startWeek !== null) {
+        if (t.segments && t.segments.length) {
+          let sw = t.startWeek;
+          t.segments.forEach(seg => {
+            if (seg.weeks > 1) {
+              merges.push({
+                s: { r: ri + 1, c: sw + 3 },
+                e: { r: ri + 1, c: sw + seg.weeks - 1 + 3 },
+              });
+            }
+            sw += seg.weeks;
+          });
+        } else if (t.weeks > 1) {
+          merges.push({
+            s: { r: ri + 1, c: t.startWeek + 3 },
+            e: { r: ri + 1, c: t.startWeek + t.weeks - 1 + 3 },
+          });
+        }
       }
     });
 
@@ -2806,14 +3224,26 @@ document.getElementById('exportExcelBtn').addEventListener('click', () => {
     chartRows.forEach((row, ri) => {
       const t = row.task;
       const excelRow = ri + 1;
-      const taskColor = hexToRgb(t.color);
-      const style = taskCellStyle(taskColor);
 
       if (t.startWeek !== null) {
-        for (let wi = t.startWeek; wi < t.startWeek + t.weeks; wi++) {
-          const addr = XLSX.utils.encode_cell({ r: excelRow, c: wi + 3 });
-          if (!ws[addr]) ws[addr] = { t: 's', v: '' };
-          ws[addr].s = style;
+        if (t.segments && t.segments.length) {
+          let sw = t.startWeek;
+          t.segments.forEach(seg => {
+            const segStyle = taskCellStyle(hexToRgb(seg.color));
+            for (let wi = sw; wi < sw + seg.weeks; wi++) {
+              const addr = XLSX.utils.encode_cell({ r: excelRow, c: wi + 3 });
+              if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+              ws[addr].s = segStyle;
+            }
+            sw += seg.weeks;
+          });
+        } else {
+          const style = taskCellStyle(hexToRgb(t.color));
+          for (let wi = t.startWeek; wi < t.startWeek + t.weeks; wi++) {
+            const addr = XLSX.utils.encode_cell({ r: excelRow, c: wi + 3 });
+            if (!ws[addr]) ws[addr] = { t: 's', v: '' };
+            ws[addr].s = style;
+          }
         }
       }
 
