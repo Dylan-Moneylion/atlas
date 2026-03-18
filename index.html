@@ -1027,6 +1027,15 @@
       cursor: grab;
     }
 
+    .task-bar .segment.segment-gap {
+      background: transparent !important;
+      border: 1.5px dashed var(--border);
+    }
+
+    .task-bar .segment.segment-gap .seg-label {
+      display: none;
+    }
+
     .task-bar .segment-divider {
       width: 2px;
       position: absolute;
@@ -1600,6 +1609,7 @@ const PHASE_TYPES = [
   ]},
   { label: 'Data', color: '#00cec9' },
   { label: 'QA', color: '#00b894' },
+  { label: 'Test', color: '#636e72' },
 ];
 
 function isEngPhase(label) {
@@ -1669,7 +1679,7 @@ function buildPhaseFilter() {
 function taskMatchesPhase(task, phase) {
   if (phaseMatchesFilter(task.phase, phase)) return true;
   if (task.segments) {
-    return task.segments.some(seg => phaseMatchesFilter(seg.label, phase));
+    return task.segments.some(seg => !seg.gap && phaseMatchesFilter(seg.label, phase));
   }
   return false;
 }
@@ -1688,12 +1698,12 @@ function applyPhaseFilter() {
     if (!activePhaseFilter) return;
 
     if (task.segments && task.segments.length) {
-      const anyMatch = task.segments.some(seg => phaseMatchesFilter(seg.label, activePhaseFilter));
+      const anyMatch = task.segments.some(seg => !seg.gap && phaseMatchesFilter(seg.label, activePhaseFilter));
       if (!anyMatch) {
         rowEl.classList.add('phase-dimmed');
       } else if (bar) {
         bar.querySelectorAll('.segment').forEach((segEl, si) => {
-          if (task.segments[si] && !phaseMatchesFilter(task.segments[si].label, activePhaseFilter)) {
+          if (task.segments[si] && (task.segments[si].gap || !phaseMatchesFilter(task.segments[si].label, activePhaseFilter))) {
             segEl.classList.add('seg-dimmed');
           }
         });
@@ -2325,6 +2335,8 @@ function createTaskBar(task, rowIdx) {
   bar.dataset.rowIdx = rowIdx;
 
   if (hasSegs) {
+    const hasGap = task.segments.some(s => s.gap);
+    if (hasGap) bar.style.background = 'transparent';
     let cumWeeks = 0;
     task.segments.forEach((seg, si) => {
       if (si > 0) {
@@ -2335,24 +2347,26 @@ function createTaskBar(task, rowIdx) {
         bar.appendChild(divider);
       }
       const segDiv = document.createElement('div');
-      segDiv.className = 'segment';
+      segDiv.className = 'segment' + (seg.gap ? ' segment-gap' : '');
       segDiv.style.left = `calc(${cumWeeks / task.weeks} * (100% + 4px))`;
       if (si < task.segments.length - 1) {
         segDiv.style.width = `calc(${seg.weeks / task.weeks} * (100% + 4px))`;
       } else {
         segDiv.style.right = '0';
       }
-      segDiv.style.background = getSegShade(task, si, task.segments.length);
+      if (!seg.gap) segDiv.style.background = getSegShade(task, si, task.segments.length);
       cumWeeks += seg.weeks;
       const segLabel = document.createElement('span');
       segLabel.className = 'seg-label';
-      segLabel.textContent = seg.label;
+      segLabel.textContent = seg.gap ? '' : seg.label;
       segDiv.appendChild(segLabel);
-      segLabel.addEventListener('dblclick', e => {
-        e.stopPropagation();
-        bar.draggable = false;
-        startSegmentRename(segLabel, task, si, () => { bar.draggable = true; });
-      });
+      if (!seg.gap) {
+        segLabel.addEventListener('dblclick', e => {
+          e.stopPropagation();
+          bar.draggable = false;
+          startSegmentRename(segLabel, task, si, () => { bar.draggable = true; });
+        });
+      }
       segDiv.addEventListener('contextmenu', e => {
         e.preventDefault();
         e.stopPropagation();
@@ -2590,6 +2604,41 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
       menu.appendChild(splitItem);
     }
 
+    const gapBefore = document.createElement('div');
+    gapBefore.className = 'menu-item';
+    gapBefore.textContent = '⤹ Insert gap before';
+    gapBefore.addEventListener('click', () => {
+      closeSegmentMenu();
+      task.segments.splice(segIdx, 0, { label: '', gap: true, color: task.color, weeks: 1 });
+      task.weeks += 1;
+      renderGantt();
+    });
+    menu.appendChild(gapBefore);
+
+    const gapAfter = document.createElement('div');
+    gapAfter.className = 'menu-item';
+    gapAfter.textContent = '⤸ Insert gap after';
+    gapAfter.addEventListener('click', () => {
+      closeSegmentMenu();
+      task.segments.splice(segIdx + 1, 0, { label: '', gap: true, color: task.color, weeks: 1 });
+      task.weeks += 1;
+      renderGantt();
+    });
+    menu.appendChild(gapAfter);
+
+    if (!seg.gap) {
+      const toGap = document.createElement('div');
+      toGap.className = 'menu-item';
+      toGap.textContent = '⬚ Convert to gap';
+      toGap.addEventListener('click', () => {
+        closeSegmentMenu();
+        seg.gap = true;
+        seg.label = '';
+        renderGantt();
+      });
+      menu.appendChild(toGap);
+    }
+
     if (task.segments.length > 1) {
       const removeItem = document.createElement('div');
       removeItem.className = 'menu-item';
@@ -2617,7 +2666,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
 
     const lbl = document.createElement('div');
     lbl.className = 'menu-label';
-    lbl.textContent = 'Set phase type';
+    lbl.textContent = seg.gap ? 'Convert to phase' : 'Set phase type';
     menu.appendChild(lbl);
 
     PHASE_TYPES.forEach(phase => {
@@ -2634,6 +2683,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
           closeSegmentMenu();
           seg.label = phase.label;
           seg.color = phase.color;
+          delete seg.gap;
           renderGantt();
         });
         sub.appendChild(baseItem);
@@ -2648,6 +2698,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
             closeSegmentMenu();
             seg.label = 'Eng: ' + opt;
             seg.color = phase.color;
+            delete seg.gap;
             renderGantt();
           });
           sub.appendChild(si);
@@ -2663,6 +2714,7 @@ function showSegmentMenu(e, task, segIdx, rowIdx) {
           closeSegmentMenu();
           seg.label = phase.label;
           seg.color = phase.color;
+          delete seg.gap;
           renderGantt();
         });
         menu.appendChild(item);
@@ -2783,6 +2835,7 @@ function showGhostRow(task, insertIdx, startWi) {
   bar.style.left = `calc(${startWi} * (100% / ${weeks.length}))`;
   bar.style.width = `calc(${task.weeks} * (100% / ${weeks.length}) - 4px)`;
   if (hasSegs) {
+    if (task.segments.some(s => s.gap)) bar.style.background = 'transparent';
     let cumW = 0;
     task.segments.forEach((seg, si) => {
       if (si > 0) {
@@ -2792,17 +2845,17 @@ function showGhostRow(task, insertIdx, startWi) {
         bar.appendChild(d);
       }
       const s = document.createElement('div');
-      s.className = 'segment';
+      s.className = 'segment' + (seg.gap ? ' segment-gap' : '');
       s.style.left = `calc(${cumW / task.weeks} * (100% + 4px))`;
       if (si < task.segments.length - 1) {
         s.style.width = `calc(${seg.weeks / task.weeks} * (100% + 4px))`;
       } else {
         s.style.right = '0';
       }
-      s.style.background = getSegShade(task, si, task.segments.length);
+      if (!seg.gap) s.style.background = getSegShade(task, si, task.segments.length);
       const l = document.createElement('span');
       l.className = 'seg-label';
-      l.textContent = seg.label;
+      l.textContent = seg.gap ? '' : seg.label;
       s.appendChild(l);
       bar.appendChild(s);
       cumW += seg.weeks;
