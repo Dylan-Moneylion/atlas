@@ -1007,11 +1007,11 @@
     }
 
     .task-bar .segment:first-of-type {
-      border-radius: 6px 0 0 6px;
+      border-radius: 0;
     }
 
     .task-bar .segment:last-of-type {
-      border-radius: 0 6px 6px 0;
+      border-radius: 0;
     }
 
     .task-bar .segment .seg-label {
@@ -1181,9 +1181,13 @@
       transition: opacity 0.2s;
     }
 
+    .task-bar.filter-active {
+      background: var(--surface-2) !important;
+    }
+
     .task-bar .segment.seg-dimmed {
-      opacity: 0.25;
-      transition: opacity 0.2s;
+      filter: brightness(0.3) saturate(0.2);
+      transition: filter 0.2s;
     }
 
     /* Drop zone (full row) */
@@ -1693,7 +1697,10 @@ function applyPhaseFilter() {
     const bar = rowEl.querySelector('.task-bar');
 
     rowEl.classList.remove('phase-dimmed');
-    if (bar) bar.querySelectorAll('.segment').forEach(s => s.classList.remove('seg-dimmed'));
+    if (bar) {
+      bar.querySelectorAll('.segment').forEach(s => s.classList.remove('seg-dimmed'));
+      bar.classList.remove('filter-active');
+    }
 
     if (!activePhaseFilter) return;
 
@@ -1702,6 +1709,7 @@ function applyPhaseFilter() {
       if (!anyMatch) {
         rowEl.classList.add('phase-dimmed');
       } else if (bar) {
+        bar.classList.add('filter-active');
         bar.querySelectorAll('.segment').forEach((segEl, si) => {
           if (task.segments[si] && (task.segments[si].gap || !phaseMatchesFilter(task.segments[si].label, activePhaseFilter))) {
             segEl.classList.add('seg-dimmed');
