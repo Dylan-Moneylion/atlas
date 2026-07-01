@@ -1,0 +1,22 @@
+{
+  "name": "atlas-gantt",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ATLAS - Aligned Timeline Layout And Scheduling. A React Gantt chart / timeline planner.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx-js-style": "^1.2.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.4",
+    "vite": "^6.0.7"
+  }
+}
